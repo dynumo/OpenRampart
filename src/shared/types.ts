@@ -239,3 +239,12 @@ export interface SearchResultDTO {
   }[];
   totals: { events: number; actors: number; incidents: number; documents: number };
 }
+
+/** Suggestions derived from a document's text. They are offered, never applied automatically. */
+export interface DocumentSuggestionsDTO {
+  dates: { value: string; text: string }[];
+  amounts: { value: string; currency: string; text: string }[];
+  references: { value: string; label: string }[];
+  actors: { actorId: string | null; name: string; reason: string }[];
+  title: string | null;
+}

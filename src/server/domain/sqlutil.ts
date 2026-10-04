@@ -2,8 +2,25 @@ import { sql, type SQL } from 'drizzle-orm';
 import { db, type Executor } from '../db/client.js';
 import { ValidationError } from '../lib/errors.js';
 
+const PG_TIMESTAMP = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}(:?\d{2})?|Z)?$/;
+const TIMESTAMP_KEY = /(_at|_after|_time)$/;
+
+/**
+ * Run a raw SQL query. Drizzle returns timestamp columns from raw queries as
+ * PostgreSQL text; columns named *_at, *_after or *_time are converted back to
+ * Date objects so raw and query-builder results behave the same.
+ */
 export async function rows<T>(query: SQL, executor: Executor = db()): Promise<T[]> {
   const result = await executor.execute(query);
+  for (const row of result.rows as Record<string, unknown>[]) {
+    for (const key of Object.keys(row)) {
+      const v = row[key];
+      if (typeof v === 'string' && TIMESTAMP_KEY.test(key) && PG_TIMESTAMP.test(v)) {
+        const d = new Date(v.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00'));
+        if (!Number.isNaN(d.getTime())) row[key] = d;
+      }
+    }
+  }
   return result.rows as T[];
 }
 

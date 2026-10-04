@@ -2,7 +2,7 @@ import { asc, eq } from 'drizzle-orm';
 import type { Direction, EventTypeDTO } from '../../shared/types.js';
 import { db } from '../db/client.js';
 import { eventTypes } from '../db/schema.js';
-import { ConflictError, NotFoundError, ValidationError } from '../lib/errors.js';
+import { ConflictError, NotFoundError, ValidationError, pgErrorCode } from '../lib/errors.js';
 import { audit } from './audit.js';
 
 /**
@@ -71,7 +71,7 @@ export async function createEventType(
     await audit({ action: 'admin.action', actorUserId: adminId, targetType: 'event_type', targetId: row!.id, metadata: { operation: 'create_event_type', key } });
     return row!;
   } catch (err) {
-    if ((err as { code?: string }).code === '23505') throw new ConflictError('An Event type with that key already exists');
+    if (pgErrorCode(err) === '23505') throw new ConflictError('An Event type with that key already exists');
     throw err;
   }
 }

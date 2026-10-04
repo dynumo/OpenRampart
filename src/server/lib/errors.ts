@@ -62,3 +62,9 @@ export class InsufficientScopeError extends AppError {
     });
   }
 }
+
+/** PostgreSQL error code from a driver error, including when wrapped by Drizzle. */
+export function pgErrorCode(err: unknown): string | undefined {
+  const e = err as { code?: string; cause?: { code?: string } };
+  return e?.code ?? e?.cause?.code;
+}

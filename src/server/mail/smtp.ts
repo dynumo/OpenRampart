@@ -15,8 +15,11 @@ export interface SmtpOptions {
 export class SmtpProvider implements MailProvider {
   readonly name = 'smtp';
   private transporter: Transporter;
-  constructor(private readonly opts: SmtpOptions) {
-    this.transporter = nodemailer.createTransport({
+  constructor(
+    private readonly opts: SmtpOptions,
+    transporter?: Transporter,
+  ) {
+    this.transporter = transporter ?? nodemailer.createTransport({
       host: opts.host,
       port: opts.port,
       secure: opts.secure,

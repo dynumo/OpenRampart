@@ -18,5 +18,5 @@ export const TEST_ENV: Record<string, string> = {
   TIMESTAMP_PROVIDER: 'opentimestamps',
   OTS_CALENDARS: 'https://calendar-a.test,https://calendar-b.test',
   OPENRAMPART_DISABLE_RATE_LIMITS: 'true',
-  REGISTRATION_MODE: 'first-user',
+  REGISTRATION_MODE: 'open',
 };

@@ -6,6 +6,7 @@ import { audit } from '../domain/audit.js';
 import { getSystemSettings } from '../domain/settings.js';
 import { decryptSecret, encryptSecret, randomToken, tokenHash } from '../lib/crypto.js';
 import {
+  pgErrorCode,
   ConflictError,
   ForbiddenError,
   UnauthenticatedError,
@@ -153,7 +154,7 @@ export async function createAccount(
     });
     return created;
   } catch (err) {
-    if ((err as { code?: string }).code === '23505') {
+    if (pgErrorCode(err) === '23505') {
       throw new ConflictError('That username or email address is already in use');
     }
     throw err;
@@ -484,7 +485,7 @@ export async function updateProfile(
     const [updated] = await db().update(users).set(patch).where(eq(users.id, user.id)).returning();
     return updated!;
   } catch (err) {
-    if ((err as { code?: string }).code === '23505') throw new ConflictError('That email address is already in use');
+    if (pgErrorCode(err) === '23505') throw new ConflictError('That email address is already in use');
     throw err;
   }
 }

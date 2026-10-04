@@ -1,6 +1,7 @@
 import { open } from 'node:fs/promises';
 import path from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
+import { ValidationError } from '../lib/errors.js';
 
 /**
  * Upload content verification. The type is determined from the file's own
@@ -23,6 +24,7 @@ const BINARY_TYPES: Record<string, Allowed> = {
   'image/webp': { category: 'image', inline: true },
   'image/gif': { category: 'image', inline: true },
   'image/tiff': { category: 'image', inline: false },
+  'image/avif': { category: 'image', inline: true },
   'image/heic': { category: 'heif', inline: false },
   'image/heif': { category: 'heif', inline: false },
   'image/heic-sequence': { category: 'heif', inline: false },
@@ -63,9 +65,9 @@ export interface DetectedType {
   inline: boolean;
 }
 
-export class UnsupportedFileError extends Error {
+export class UnsupportedFileError extends ValidationError {
   constructor(message: string) {
-    super(message);
+    super(message, { file: message });
     this.name = 'UnsupportedFileError';
   }
 }

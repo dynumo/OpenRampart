@@ -91,8 +91,8 @@ export interface Browser {
 }
 
 /** Register through the HTTP API and complete TOTP enrolment. */
-export async function registerBrowser(username = uniq('web')): Promise<Browser> {
-  const agent = request.agent(testApp());
+export async function registerBrowser(username = uniq('web'), base?: string): Promise<Browser> {
+  const agent = base ? request.agent(base) : request.agent(testApp());
   await agent
     .post('/api/auth/register')
     .set('X-CSRF-Token', '1')

@@ -103,6 +103,10 @@ export async function approveInteraction(
   const params = details.params as Record<string, string | undefined>;
   const grant = new provider.Grant({ accountId: input.userId, clientId: view.client.id });
   grant.addResourceScope(view.resource, granted.join(' '));
+  // Scopes the user unticked are recorded as rejected so the request completes
+  // with only what was allowed (the client sees the narrower scope in the token response).
+  const rejected = String(params.scope ?? '').split(/\s+/).filter((s) => s && s !== 'openid' && s !== 'offline_access' && !granted.includes(s as OAuthScope));
+  if (rejected.length) grant.rejectResourceScope(view.resource, rejected.join(' '));
   const requestedOidc = String(params.scope ?? '').split(/\s+/).filter((s) => s === 'openid' || s === 'offline_access');
   if (requestedOidc.length) grant.addOIDCScope(requestedOidc.join(' '));
   const grantId = await grant.save();

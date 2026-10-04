@@ -35,6 +35,13 @@ export async function oauthProvider(req: Request, res: Response, next: NextFunct
       await rate.hit('oauthToken', req.ip ?? 'unknown');
     }
     const provider = await getProvider();
+    // A client that asks for no scope gets the read-only default set (RFC 6749 §3.3).
+    if (req.method === 'GET' && req.path === '/authorize' && !req.query.scope) {
+      const url = new URL(req.url, 'http://x');
+      url.searchParams.set('scope', DEFAULT_SCOPES.join(' '));
+      req.url = url.pathname + url.search;
+      req.originalUrl = OAUTH_MOUNT + req.url;
+    }
     // Express has already stripped the /oauth mount from req.url; oidc-provider
     // derives its mount path from req.originalUrl, so endpoint URLs stay correct.
     provider.callback()(req, res);

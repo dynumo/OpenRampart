@@ -346,7 +346,7 @@ export async function mergeActors(
   targetId: string,
   sourceIds: string[],
   opts: { extendHelperAccess?: boolean } = {},
-): Promise<ActorDTO> {
+): ReturnType<typeof getActor> {
   const { target, sources } = await loadMergeActors(ctx, targetId, sourceIds);
   const sourceIdList = sources.map((s) => s.id);
   await db().transaction(async (tx) => {

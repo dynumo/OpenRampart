@@ -147,7 +147,7 @@ export function createApp(opts: AppOptions = {}): Express {
           },
         }),
       );
-      app.get('/*splat', (req, res, next) => {
+      app.get(['/', '/*splat'], (req, res, next) => {
         if (req.path.startsWith('/api/') || req.path.startsWith('/.well-known/')) return next();
         res.set('Cache-Control', 'no-cache');
         res.sendFile(path.join(root, 'index.html'));

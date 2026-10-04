@@ -102,7 +102,10 @@ export function requireAdmin(_req: Request, res: Response, next: NextFunction) {
 export async function recordContext(req: Request, res: Response, next: NextFunction) {
   const user = locals(res).user;
   if (!user) return next(new UnauthenticatedError());
-  const requested = req.get('x-openrampart-record') || null;
+  // Images and documents are loaded by the browser without custom headers, so
+  // GET requests may name the record in the query string instead.
+  const fromQuery = req.method === 'GET' && typeof req.query.record === 'string' ? req.query.record : null;
+  const requested = req.get('x-openrampart-record') || fromQuery || null;
   try {
     locals(res).ctx = await resolveContext({ userId: user.id, ownerId: requested, via: 'web', ...requestMeta(req) });
     next();

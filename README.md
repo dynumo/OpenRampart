@@ -13,16 +13,12 @@ a benefits claim, a housing repair, a complaint, a debt, a dispute with an emplo
 healthcare journey. It is also built for the people who help them.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/timeline-dark.png">
   <img src="docs/images/timeline-light.png" alt="The OpenRampart timeline: Events grouped by month, each showing its date, title, type, Actor, and any risk level or due date." width="1280">
 </picture>
 
 <p>
   <img src="docs/images/event-light.png" alt="An Event page for a decision letter, with its date, Actor, amount, notes, attachments and the Incident it belongs to." width="49%">
   <img src="docs/images/incident-light.png" alt="An Incident page about damp and mould, with its status and a timeline of its six related Events." width="49%">
-</p>
-<p>
-  <img src="docs/images/timeline-mobile-dark.png" alt="The timeline on a phone in dark mode, with bottom navigation and a button to add an Event." width="260">
 </p>
 
 <sub>Screenshots use made-up data. Regenerate them with <code>npm run build && npm run screenshots</code>.</sub>

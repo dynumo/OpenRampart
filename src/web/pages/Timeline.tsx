@@ -155,7 +155,6 @@ export function useEventPages(filters: TimelineFilterState, extra: Record<string
     queryFn: ({ pageParam }) =>
       api<Page<EventSummaryDTO> & { correctedQuery?: string | null }>('/events', {
         query: {
-          ...extra,
           actorId: filters.actorId,
           typeId: filters.typeId,
           incidentId: filters.incidentId,
@@ -167,6 +166,8 @@ export function useEventPages(filters: TimelineFilterState, extra: Record<string
           order: filters.order,
           cursor: pageParam ?? undefined,
           limit: 40,
+          // Fixed context (e.g. the Actor whose timeline this is) wins over filters.
+          ...extra,
         },
       }),
     getNextPageParam: (last) => last.nextCursor,

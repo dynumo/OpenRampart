@@ -26,8 +26,8 @@ export function Layout() {
   async function signOut() {
     await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
     qc.clear();
-    navigate('/login');
-    window.location.reload();
+    // A full page load discards all in-memory record data.
+    window.location.assign('/login');
   }
 
   return (

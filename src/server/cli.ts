@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
-import { adminResetTotp, createAccount } from './auth/accounts.js';
+import { adminResetTotp, createAccount, operatorSetPassword } from './auth/accounts.js';
 import { revokeAllSessions } from './auth/sessions.js';
 import { closeDb, db, getPool } from './db/client.js';
 import { runMigrations } from './db/migrator.js';
@@ -11,6 +11,7 @@ import { runMaintenance } from './jobs/maintenance.js';
  * Operator command line (run inside the container):
  *   node dist/server/cli.js migrate
  *   node dist/server/cli.js create-admin <username> <display name>   (password read from OPENRAMPART_PASSWORD)
+ *   node dist/server/cli.js reset-password <username>                (new password read from OPENRAMPART_PASSWORD)
  *   node dist/server/cli.js reset-totp <username>
  *   node dist/server/cli.js disable <username> | enable <username>
  *   node dist/server/cli.js maintenance
@@ -50,6 +51,17 @@ async function main() {
       );
       break;
     }
+    case 'reset-password': {
+      const password = process.env.OPENRAMPART_PASSWORD;
+      if (!args[0] || !password)
+        throw new Error('Usage: OPENRAMPART_PASSWORD=... cli.js reset-password <username>');
+      const u = await findUser(args[0]);
+      await operatorSetPassword(u.id, password);
+      console.log(
+        `New password set for ${u.username}; their sessions were signed out. Two-step sign-in is unchanged.`,
+      );
+      break;
+    }
     case 'reset-totp': {
       const u = await findUser(args[0] ?? '');
       await adminResetTotp({ ...u, isAdmin: true }, u.id, { ip: 'cli' });
@@ -82,7 +94,7 @@ async function main() {
       break;
     default:
       console.log(
-        'Commands: migrate | create-admin <username> <name> | reset-totp <username> | disable <username> | enable <username> | maintenance',
+        'Commands: migrate | create-admin <username> <name> | reset-password <username> | reset-totp <username> | disable <username> | enable <username> | maintenance',
       );
   }
 }

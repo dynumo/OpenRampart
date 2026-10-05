@@ -7,7 +7,7 @@ import { pinoHttp } from 'pino-http';
 import { ZodError } from 'zod';
 import { config } from '../config.js';
 import { getPool } from '../db/client.js';
-import { logger } from '../lib/logger.js';
+import { loggablePath, logger } from '../lib/logger.js';
 import { storageHealthy } from '../storage/s3.js';
 import {
   csrfProtection,
@@ -46,12 +46,12 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use(
     pinoHttp({
       logger,
-      // Never log query strings: they can contain one-time tokens or search text.
+      // Never log query strings or one-time tokens in paths: they can contain secrets or search text.
       serializers: {
         req: (req: { method: string; url: string; id: unknown }) => ({
           id: req.id,
           method: req.method,
-          path: String(req.url).split('?')[0],
+          path: loggablePath(req.url),
         }),
         res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
       },

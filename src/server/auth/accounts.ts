@@ -9,6 +9,7 @@ import {
   pgErrorCode,
   ConflictError,
   ForbiddenError,
+  NotFoundError,
   UnauthenticatedError,
   ValidationError,
 } from '../lib/errors.js';
@@ -30,6 +31,7 @@ import {
 } from './recoveryCodes.js';
 import { createSession, revokeAllSessions, revokeSession, type SessionMeta } from './sessions.js';
 import { checkTotp, formatSecretForDisplay, newTotpSecret, totpQrSvg, totpUri } from './totp.js';
+import { logger } from '../lib/logger.js';
 
 export type User = typeof users.$inferSelect;
 
@@ -576,9 +578,14 @@ export async function requestPasswordReset(login: string, meta: SessionMeta): Pr
     ip: meta.ip,
     userAgent: meta.userAgent,
   });
-  await sendMail(
-    passwordResetEmail({ to: user.email, url: `${config().APP_URL}/reset-password/${token}` }),
-  );
+  try {
+    await sendMail(
+      passwordResetEmail({ to: user.email, url: `${config().APP_URL}/reset-password/${token}` }),
+    );
+  } catch (err) {
+    // Answer exactly as for an unknown account, so delivery problems reveal nothing.
+    logger.warn({ err: (err as Error).message }, 'password reset email could not be sent');
+  }
 }
 
 export async function completePasswordReset(
@@ -645,6 +652,31 @@ export async function adminResetTotp(
     ip: meta.ip,
     userAgent: meta.userAgent,
     metadata: { operation: 'reset_totp' },
+  });
+}
+
+/**
+ * Set a new password for someone who has lost theirs, from the operator CLI.
+ * Not exposed in the web interface: an operator already has the database, an
+ * in-app administrator should not be able to take over another person's account.
+ * Two-step sign-in is unaffected, so the person still needs their authenticator.
+ */
+export async function operatorSetPassword(targetId: string, newPassword: string): Promise<void> {
+  const user = await getUser(targetId);
+  if (!user) throw new NotFoundError('Account');
+  validatePassword(newPassword, { username: user.username, email: user.email });
+  await db()
+    .update(users)
+    .set({ passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date() })
+    .where(eq(users.id, targetId));
+  await revokeAllSessions(targetId, 'password_reset');
+  await audit({
+    action: 'admin.action',
+    ownerId: targetId,
+    via: 'cli',
+    targetType: 'user',
+    targetId,
+    metadata: { operation: 'reset_password' },
   });
 }
 

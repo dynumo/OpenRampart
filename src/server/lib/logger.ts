@@ -37,3 +37,28 @@ export const logger = pino({
 });
 
 export type Logger = typeof logger;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * A request path that is safe to log: no query string, and no one-time tokens
+ * (invitation and password-reset links, OAuth interaction ids). Record ids are
+ * UUIDs and are kept, because they identify rows without revealing content.
+ */
+function isTokenLike(segment: string): boolean {
+  // Random tokens are long and mix cases or digits; route names are lower-case words.
+  return (
+    segment.length >= 16 &&
+    !UUID.test(segment) &&
+    /^[A-Za-z0-9_-]+$/.test(segment) &&
+    /[0-9A-Z]/.test(segment)
+  );
+}
+
+export function loggablePath(url: string): string {
+  const path = String(url).split('?')[0]!;
+  return path
+    .split('/')
+    .map((segment) => (isTokenLike(segment) ? ':token' : segment))
+    .join('/');
+}

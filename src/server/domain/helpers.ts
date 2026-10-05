@@ -17,6 +17,8 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '.
 import { randomToken, tokenHash } from '../lib/crypto.js';
 import { invitationEmail } from '../mail/templates.js';
 import { mailConfigured, sendMail, sendNotification } from '../mail/index.js';
+import { logger } from '../lib/logger.js';
+import type { MailMessage } from '../mail/types.js';
 import { securityNotificationEmail } from '../mail/templates.js';
 import { audit, auditCtx } from './audit.js';
 import { isOwner, type AccessContext } from './context.js';
@@ -64,6 +66,20 @@ function parse<T extends z.ZodTypeAny>(schema: T, input: unknown): z.output<T> {
     throw new ValidationError('Please check the access settings', fields);
   }
   return r.data;
+}
+
+/**
+ * Send an invitation email. A delivery failure is not fatal: the invitation
+ * already exists and its link is shown to the owner to share another way.
+ */
+async function sendInvitationEmail(message: MailMessage): Promise<boolean> {
+  try {
+    await sendMail(message);
+    return true;
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'invitation email could not be sent');
+    return false;
+  }
 }
 
 /** Validate grant targets belong to the owner; returns cleaned ids. */
@@ -298,7 +314,7 @@ export async function inviteHelper(
       .select({ name: users.displayName })
       .from(users)
       .where(eq(users.id, ctx.ownerId));
-    await sendMail(
+    emailed = await sendInvitationEmail(
       invitationEmail({
         to: email,
         ownerName: owner?.name ?? 'Someone',
@@ -308,7 +324,6 @@ export async function inviteHelper(
         expiresAt: invite.expiresAt,
       }),
     );
-    emailed = true;
   }
   return { helper, url: invite.url, emailed };
 }
@@ -335,7 +350,7 @@ export async function reissueInvitation(
       .select({ name: users.displayName })
       .from(users)
       .where(eq(users.id, ctx.ownerId));
-    await sendMail(
+    emailed = await sendInvitationEmail(
       invitationEmail({
         to: rel.invitedEmail,
         ownerName: owner?.name ?? 'Someone',
@@ -345,7 +360,6 @@ export async function reissueInvitation(
         expiresAt: invite.expiresAt,
       }),
     );
-    emailed = true;
   }
   return { helper, url: invite.url, emailed };
 }

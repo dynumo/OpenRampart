@@ -2,6 +2,7 @@
   "name": "openrampart",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "A personal administrative event log: a durable, searchable record of your interactions with organisations, institutions and people.",
   "type": "module",
   "engines": {

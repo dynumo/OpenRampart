@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { db } from '../../src/server/db/client.js';
 import { nextTotpCode, registerBrowser, testApp, uniq } from './helpers.js';
+import { operatorSetPassword } from '../../src/server/auth/accounts.js';
 
 async function login(username: string, password = 'a long enough passphrase') {
   const agent = request.agent(testApp());
@@ -48,6 +49,15 @@ describe('Accounts, TOTP and sessions', () => {
       .set('X-CSRF-Token', '1')
       .send({ username: b.username, displayName: 'X', password: 'another long passphrase' });
     expect([403, 409]).toContain(dup.status);
+  });
+
+  it('lets the operator set a new password without bypassing two-step sign-in', async () => {
+    const b = await registerBrowser();
+    await operatorSetPassword(b.userId, 'an operator chosen passphrase');
+    await b.agent.get('/api/events').expect(401);
+    expect((await login(b.username)).res.status).not.toBe(200);
+    const { res } = await login(b.username, 'an operator chosen passphrase');
+    expect(res.body.stage).toBe('mfa');
   });
 
   it('logs in with password then TOTP, and refuses a replayed code', async () => {
@@ -145,6 +155,12 @@ describe('Accounts, TOTP and sessions', () => {
       .set('X-CSRF-Token', b.csrf)
       .set('Origin', 'https://evil.example')
       .send({ name: 'Cross origin' })
+      .expect(403);
+    await b.agent
+      .post('/api/actors')
+      .set('X-CSRF-Token', b.csrf)
+      .set('Sec-Fetch-Site', 'cross-site')
+      .send({ name: 'Cross site' })
       .expect(403);
     await b.agent
       .post('/api/actors')

@@ -174,6 +174,31 @@ describe('Mail providers', () => {
     ).rejects.toThrow(/401/);
   });
 
+  it('still creates the invitation and returns its link when the email cannot be sent', async () => {
+    setMailProvider(
+      new ElasticEmailProvider({
+        apiKey: 'k',
+        baseUrl: 'http://example.invalid',
+        fromAddress: 'a@b.c',
+        fromName: 'x',
+        fetchImpl: (async () =>
+          new Response('{"Error":"Service unavailable"}', {
+            status: 503,
+          })) as unknown as typeof fetch,
+      }),
+    );
+    const b = await registerBrowser();
+    const ctx = await ownerCtx(b.userId);
+    const result = await inviteHelper(ctx, {
+      label: 'Adviser',
+      email: 'adviser@example.test',
+      sendEmail: true,
+      grant: { scopeType: 'all', canAdd: false, canExport: false },
+    });
+    expect(result.emailed).toBe(false);
+    expect(result.url).toMatch(/\/invite\//);
+  });
+
   it('sends through SMTP as an alternative provider', async () => {
     const transport = nodemailer.createTransport({ jsonTransport: true });
     const smtp = new SmtpProvider(

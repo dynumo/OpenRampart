@@ -81,6 +81,10 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   if (origin && origin !== config().appUrl.origin) {
     return next(new ForbiddenError('Cross-origin request refused'));
   }
+  // Browsers that send Fetch Metadata say outright when a request comes from another site.
+  if (req.get('sec-fetch-site') === 'cross-site') {
+    return next(new ForbiddenError('Cross-origin request refused'));
+  }
   const header = req.get('x-csrf-token');
   const session = locals(res).session;
   if (!header || (session && header !== session.csrfToken)) {

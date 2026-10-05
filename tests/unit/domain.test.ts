@@ -17,6 +17,7 @@ import { loadConfig, ConfigError } from '../../src/server/config.js';
 import { sanitiseFilename, isInlineSafe } from '../../src/server/storage/fileTypes.js';
 import { validatePassword } from '../../src/server/auth/passwords.js';
 import { normaliseRecoveryCode } from '../../src/server/auth/recoveryCodes.js';
+import { loggablePath } from '../../src/server/lib/logger.js';
 
 describe('date handling', () => {
   it('interprets date-only and local times in the record owner’s time zone, across DST', () => {
@@ -155,5 +156,20 @@ describe('file and credential safety', () => {
       'attachments:metadata',
       'attachments:read',
     ]);
+  });
+});
+
+describe('request logging', () => {
+  it('never logs query strings or one-time tokens in paths', () => {
+    const token = 'kQ3x9_Zr-8uYH2b1mN0pLwE4tV7sC6dA';
+    expect(loggablePath(`/api/invitations/${token}/accept`)).toBe('/api/invitations/:token/accept');
+    expect(loggablePath(`/reset-password/${token}`)).toBe('/reset-password/:token');
+    expect(loggablePath('/api/search?q=housing+benefit')).toBe('/api/search');
+    const id = '0b6f0d0e-4c1e-4a59-9a3c-2a8f2f8f1a11';
+    expect(loggablePath(`/api/events/${id}/attachments`)).toBe(`/api/events/${id}/attachments`);
+    expect(loggablePath('/api/settings/connections')).toBe('/api/settings/connections');
+    expect(loggablePath('/.well-known/oauth-authorization-server')).toBe(
+      '/.well-known/oauth-authorization-server',
+    );
   });
 });

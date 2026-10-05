@@ -6,6 +6,7 @@ import { audit } from '../domain/audit.js';
 import { getSystemSettings } from '../domain/settings.js';
 import { decryptSecret, encryptSecret, randomToken, tokenHash } from '../lib/crypto.js';
 import {
+  AppError,
   pgErrorCode,
   ConflictError,
   ForbiddenError,
@@ -305,7 +306,7 @@ export async function verifySecondFactor(
   await rate.hit('mfa', user.id);
   let method: 'totp' | 'recovery_code' | null = null;
   if (user.totpSecretEnc && /^\s*\d{3}\s?\d{3}\s*$/.test(code)) {
-    const result = await checkTotp(decryptSecret(user.totpSecretEnc), code, user.totpLastStep);
+    const result = await checkTotp(totpSecret(user.totpSecretEnc), code, user.totpLastStep);
     if (result.valid) {
       method = 'totp';
       await db()
@@ -393,7 +394,7 @@ export async function confirmTotpSetup(
       });
     }
     const current = await checkTotp(
-      decryptSecret(user.totpSecretEnc),
+      totpSecret(user.totpSecretEnc),
       opts.currentCode,
       user.totpLastStep,
     );
@@ -402,7 +403,7 @@ export async function confirmTotpSetup(
         currentCode: 'That code is not correct.',
       });
   }
-  const secret = decryptSecret(user.totpPendingSecretEnc);
+  const secret = totpSecret(user.totpPendingSecretEnc);
   const result = await checkTotp(secret, code);
   if (!result.valid) {
     throw new ValidationError('That code is not correct', {
@@ -556,6 +557,20 @@ export async function updateProfile(
     if (pgErrorCode(err) === '23505')
       throw new ConflictError('That email address is already in use');
     throw err;
+  }
+}
+
+/** Decrypt a stored TOTP secret, explaining what to do if ENCRYPTION_KEY has changed. */
+function totpSecret(enc: string): string {
+  try {
+    return decryptSecret(enc);
+  } catch {
+    logger.error('A TOTP secret cannot be decrypted with the current ENCRYPTION_KEY');
+    throw new AppError(
+      'Two-step sign-in for this account cannot be checked. Ask whoever runs this installation to reset it.',
+      409,
+      'totp_unreadable',
+    );
   }
 }
 

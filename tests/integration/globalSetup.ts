@@ -6,6 +6,9 @@ export default async function setup() {
   Object.assign(process.env, TEST_ENV);
   const url = new URL(TEST_ENV.DATABASE_URL!);
   const dbName = url.pathname.slice(1);
+  // This database is dropped and recreated: never let a mistyped TEST_DATABASE_URL hit real data.
+  if (!dbName.endsWith('_test'))
+    throw new Error(`Refusing to reset a database not named *_test (${dbName})`);
   const admin = new pg.Client({
     connectionString: Object.assign(new URL(url), { pathname: '/postgres' }).toString(),
   });

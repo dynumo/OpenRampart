@@ -37,7 +37,18 @@ async function signingKeys() {
     .from(systemKeys)
     .where(eq(systemKeys.id, 'oauth_jwks'))
     .limit(1);
-  if (row) return JSON.parse(decryptSecret(row.valueEnc)) as { keys: Record<string, unknown>[] };
+  if (row) {
+    try {
+      return JSON.parse(decryptSecret(row.valueEnc)) as { keys: Record<string, unknown>[] };
+    } catch {
+      // ENCRYPTION_KEY was changed or lost. The key only signs ID tokens (access tokens are
+      // opaque), so replace it rather than leave every OAuth endpoint failing.
+      logger.error(
+        'The stored OAuth signing key cannot be decrypted with the current ENCRYPTION_KEY; generating a new one',
+      );
+      await db().delete(systemKeys).where(eq(systemKeys.id, 'oauth_jwks'));
+    }
+  }
   const { privateKey } = await generateKeyPair('ES256', { extractable: true });
   const jwk = {
     ...(await exportJWK(privateKey)),

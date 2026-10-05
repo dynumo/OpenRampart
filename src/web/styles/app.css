@@ -1130,3 +1130,20 @@ dialog::backdrop {
     padding: 0;
   }
 }
+
+/* Windows High Contrast and other forced-colour modes: keep edges and focus visible. */
+@media (forced-colors: active) {
+  .btn,
+  .badge,
+  .chip,
+  .event-card {
+    border: 1px solid CanvasText;
+  }
+  :focus-visible,
+  .event-card:focus-within {
+    outline-color: Highlight;
+  }
+  .icon {
+    forced-color-adjust: auto;
+  }
+}

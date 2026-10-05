@@ -199,7 +199,65 @@ export function AccountSettingsPage() {
           </button>
         </form>
       </section>
+      <AppearanceSection />
     </>
+  );
+}
+
+type ThemeChoice = 'system' | 'light' | 'dark';
+
+function readTheme(): ThemeChoice {
+  try {
+    const t = localStorage.getItem('openrampart.theme');
+    return t === 'light' || t === 'dark' ? t : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+/** Per-device colour theme. Stored on this device only; the system setting applies by default. */
+function AppearanceSection() {
+  const [theme, setTheme] = useState<ThemeChoice>(readTheme);
+  const choose = (v: string) => {
+    const next = v as ThemeChoice;
+    setTheme(next);
+    try {
+      if (next === 'system') localStorage.removeItem('openrampart.theme');
+      else localStorage.setItem('openrampart.theme', next);
+    } catch {
+      // storage unavailable: the choice applies until the page is reloaded
+    }
+    if (next === 'system') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = next;
+  };
+  return (
+    <section className="card" aria-labelledby="appearance-h" style={{ marginTop: '1rem' }}>
+      <h2 id="appearance-h">Appearance</h2>
+      <fieldset>
+        <legend>Colour theme on this device</legend>
+        <Radio
+          name="theme"
+          value="system"
+          label="Match my device"
+          checked={theme === 'system'}
+          onChange={choose}
+        />
+        <Radio
+          name="theme"
+          value="light"
+          label="Light"
+          checked={theme === 'light'}
+          onChange={choose}
+        />
+        <Radio
+          name="theme"
+          value="dark"
+          label="Dark"
+          checked={theme === 'dark'}
+          onChange={choose}
+        />
+      </fieldset>
+    </section>
   );
 }
 

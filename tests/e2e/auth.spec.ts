@@ -65,6 +65,24 @@ test.describe('Accounts, TOTP, recovery codes and sessions', () => {
     await expectAccessible(page, 'audit log');
   });
 
+  test('the colour theme can be chosen per device and is accessible in dark mode', async ({
+    page,
+  }) => {
+    await register(page);
+    await page.goto('/settings/account');
+    await page.getByLabel('Dark', { exact: true }).check();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.getByLabel('Dark', { exact: true })).toBeChecked();
+    await expectAccessible(page, 'account settings (dark)');
+    await page.goto('/');
+    await expectAccessible(page, 'timeline (dark)');
+    await page.goto('/settings/account');
+    await page.getByLabel('Match my device').check();
+    await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+  });
+
   test('session revocation signs the other device out', async ({ page, browser }) => {
     const account = await register(page);
     const other = await browser.newContext();

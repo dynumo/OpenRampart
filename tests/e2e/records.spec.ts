@@ -106,4 +106,26 @@ test.describe('Recording Events, Actors and Incidents', () => {
     await expectAccessible(phone, 'mobile timeline');
     await context.close();
   });
+
+  test('content reflows at 320 CSS pixels without horizontal scrolling (WCAG 1.4.10)', async ({
+    page,
+  }) => {
+    await register(page);
+    const id = await createEventViaUi(page, {
+      type: 'letter_in',
+      title: 'A letter with a fairly long title about a housing benefit overpayment review',
+      actor: 'Department for Work and Pensions',
+      newActor: true,
+      notes: 'Reference HB/2026/000123456789. Asked for the decision to be looked at again.',
+    });
+    await page.setViewportSize({ width: 320, height: 640 });
+    for (const path of ['/', `/events/${id}`, '/events/new/letter_in', '/search', '/settings']) {
+      await page.goto(path);
+      await expect(page.locator('main h1')).toBeVisible();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `horizontal overflow on ${path}`).toBeLessThanOrEqual(0);
+    }
+  });
 });

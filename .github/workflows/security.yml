@@ -1,15 +1,23 @@
 name: Security
 
+# Documentation-only changes (README, docs/, screenshots) skip these scans; the weekly
+# schedule still covers everything.
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
   pull_request:
+    paths-ignore: ['**.md', 'docs/**']
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   npm-audit:

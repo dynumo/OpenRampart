@@ -1,0 +1,24 @@
+/** Environment for integration tests: a dedicated database and bucket. */
+export const TEST_ENV: Record<string, string> = {
+  NODE_ENV: 'test',
+  APP_URL: 'http://localhost:3999',
+  DATABASE_URL:
+    process.env.TEST_DATABASE_URL ??
+    'postgres://openrampart:openrampart@localhost:5432/openrampart_test',
+  SESSION_SECRET: 'test-session-secret-0123456789abcdefghijklmnopqrstuvwxyz',
+  ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  S3_ENDPOINT: process.env.TEST_S3_ENDPOINT ?? 'http://localhost:8333',
+  S3_BUCKET: process.env.TEST_S3_BUCKET ?? 'openrampart-test',
+  S3_ACCESS_KEY_ID: process.env.TEST_S3_ACCESS_KEY_ID ?? 'openrampart',
+  S3_SECRET_ACCESS_KEY: process.env.TEST_S3_SECRET_ACCESS_KEY ?? 'openrampart-dev-secret',
+  S3_FORCE_PATH_STYLE: 'true',
+  S3_CREATE_BUCKET: 'true',
+  MAIL_PROVIDER: 'log',
+  MAIL_FROM_ADDRESS: 'test@openrampart.invalid',
+  LOG_LEVEL: 'silent',
+  OCR_ENABLED: 'true',
+  TIMESTAMP_PROVIDER: 'opentimestamps',
+  OTS_CALENDARS: 'https://calendar-a.test,https://calendar-b.test',
+  OPENRAMPART_DISABLE_RATE_LIMITS: 'true',
+  REGISTRATION_MODE: 'open',
+};

@@ -1,0 +1,128 @@
+# OpenRampart — production Compose file (works as-is with Dokploy "Docker Compose" deployments).
+#
+#   cp .env.example .env    # then fill in the required values
+#   docker compose up -d
+#
+# Services:
+#   app       — web server and background worker (OCR, timestamping, housekeeping) in one process
+#   postgres  — PostgreSQL 17 with a named volume
+#   s3        — optional bundled SeaweedFS S3 store; enable with COMPOSE_PROFILES=bundled-s3
+#               (otherwise point S3_* at Cloudflare R2, Backblaze B2, Hetzner, AWS, MinIO, …)
+#
+# No container_name is set, so Dokploy (and several copies of this stack) can run side by side.
+# The app is only exposed on the internal network; put a reverse proxy (Dokploy/Traefik,
+# Caddy, nginx) in front of port 3000 and serve it over HTTPS at APP_URL.
+
+x-app-env: &app-env
+  NODE_ENV: production
+  APP_URL: ${APP_URL:?Set APP_URL to the public https:// address}
+  DATABASE_URL: postgres://${POSTGRES_USER:-openrampart}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-openrampart}
+  SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET (openssl rand -base64 48)}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY (openssl rand -base64 32)}
+  TRUST_PROXY: ${TRUST_PROXY:-1}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  REGISTRATION_MODE: ${REGISTRATION_MODE:-first-user}
+  REQUIRE_TOTP: ${REQUIRE_TOTP:-true}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET: ${S3_BUCKET:?Set S3_BUCKET}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY}
+  S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+  S3_CREATE_BUCKET: ${S3_CREATE_BUCKET:-false}
+  S3_KEY_PREFIX: ${S3_KEY_PREFIX:-}
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+  DELETION_RETENTION_DAYS: ${DELETION_RETENTION_DAYS:-30}
+  OCR_ENABLED: ${OCR_ENABLED:-true}
+  OCR_LANGUAGES: ${OCR_LANGUAGES:-eng}
+  OCR_CONCURRENCY: ${OCR_CONCURRENCY:-1}
+  TIMESTAMP_PROVIDER: ${TIMESTAMP_PROVIDER:-none}
+  OTS_CALENDARS: ${OTS_CALENDARS:-}
+  BITCOIN_EXPLORER_URL: ${BITCOIN_EXPLORER_URL:-https://blockstream.info/api}
+  OAUTH_ENABLE_DCR: ${OAUTH_ENABLE_DCR:-true}
+  OAUTH_ENABLE_CIMD: ${OAUTH_ENABLE_CIMD:-true}
+  MAIL_PROVIDER: ${MAIL_PROVIDER:-none}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-OpenRampart}
+  ELASTIC_EMAIL_API_KEY: ${ELASTIC_EMAIL_API_KEY:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+
+services:
+  app:
+    image: ${OPENRAMPART_IMAGE:-openrampart:latest}
+    build:
+      context: .
+      args:
+        OCR_LANGUAGE_PACKS: ${OCR_LANGUAGE_PACKS:-eng}
+    restart: unless-stopped
+    environment: *app-env
+    expose:
+      - '3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    # Uploads are streamed through /tmp before reaching object storage.
+    tmpfs:
+      - /tmp:size=${UPLOAD_TMPFS_SIZE:-1g},mode=1777
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-openrampart}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-openrampart}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Optional bundled object storage. Enable with COMPOSE_PROFILES=bundled-s3 and set
+  #   S3_ENDPOINT=http://s3:8333  S3_FORCE_PATH_STYLE=true  S3_CREATE_BUCKET=true
+  s3:
+    image: chrislusf/seaweedfs:${SEAWEEDFS_TAG:-latest}
+    profiles: ['bundled-s3']
+    restart: unless-stopped
+    environment:
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -e
+        mkdir -p /etc/seaweedfs
+        printf '{"identities":[{"name":"openrampart","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' \
+          "$$S3_ACCESS_KEY_ID" "$$S3_SECRET_ACCESS_KEY" > /etc/seaweedfs/s3.json
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    expose:
+      - '8333'
+    volumes:
+      - s3-data:/data
+
+volumes:
+  postgres-data:
+  s3-data:

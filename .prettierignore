@@ -1,0 +1,10 @@
+dist
+node_modules
+coverage
+playwright-report
+test-results
+migrations/*.sql
+package-lock.json
+tests/fixtures
+src/web/styles/tokens.css
+public/icons

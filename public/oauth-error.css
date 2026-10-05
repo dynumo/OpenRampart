@@ -1,0 +1,41 @@
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  background: #edf5fd;
+  color: #0a1622;
+  line-height: 1.55;
+}
+main {
+  max-width: 34rem;
+  margin: 3rem auto;
+  padding: 1.5rem;
+  background: #fcfeff;
+  border: 1px solid #c5d0dc;
+  border-radius: 0.75rem;
+}
+a {
+  color: #546a80;
+}
+dt {
+  font-weight: 600;
+}
+dd {
+  margin: 0 0 1rem;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #060c12;
+    color: #e8f0f9;
+  }
+  main {
+    background: #0c131a;
+    border-color: #252d35;
+  }
+  a {
+    color: #a7bacd;
+  }
+}

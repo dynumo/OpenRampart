@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  static:
+    name: Typecheck, lint, format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Design tokens are up to date
+        run: node scripts/generate-tokens.mjs && git diff --exit-code -- src/web/styles/tokens.css
+
+  test:
+    name: Unit and integration tests
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: openrampart
+          POSTGRES_PASSWORD: openrampart
+          POSTGRES_DB: openrampart
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U openrampart" --health-interval 5s --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start S3-compatible storage (SeaweedFS)
+        run: |
+          docker run -d --name s3 -p 8333:8333 \
+            -v "$PWD/.github/ci:/etc/seaweedfs:ro" \
+            chrislusf/seaweedfs:latest server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/seaweedfs-s3.json
+      - name: Install OCR toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng ocrmypdf poppler-utils libheif-examples
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Wait for S3
+        run: timeout 60 bash -c 'until curl -s -o /dev/null http://localhost:8333; do sleep 2; done'
+      - run: npm run test:unit
+      - run: npm run test:integration
+
+  e2e:
+    name: End-to-end and accessibility (Playwright + axe)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: openrampart
+          POSTGRES_PASSWORD: openrampart
+          POSTGRES_DB: openrampart
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U openrampart" --health-interval 5s --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start S3-compatible storage (SeaweedFS)
+        run: |
+          docker run -d --name s3 -p 8333:8333 \
+            -v "$PWD/.github/ci:/etc/seaweedfs:ro" \
+            chrislusf/seaweedfs:latest server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/seaweedfs-s3.json
+      - name: Install OCR toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng ocrmypdf poppler-utils libheif-examples
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Wait for S3
+        run: timeout 60 bash -c 'until curl -s -o /dev/null http://localhost:8333; do sleep 2; done'
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  docker:
+    name: Container image builds
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: openrampart:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Image contains the OCR toolchain and runs as non-root
+        run: |
+          docker run --rm --entrypoint sh openrampart:ci -c 'test "$(id -u)" != 0 && tesseract --version && ocrmypdf --version && pdftotext -v && command -v heif-convert'
+      - name: Compose file is valid
+        run: |
+          APP_URL=https://example.org POSTGRES_PASSWORD=x SESSION_SECRET=x ENCRYPTION_KEY=x \
+          S3_BUCKET=b S3_ACCESS_KEY_ID=k S3_SECRET_ACCESS_KEY=s \
+          docker compose -f docker-compose.yml config -q

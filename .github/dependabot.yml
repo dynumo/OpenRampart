@@ -16,6 +16,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # One pull request for all action updates, so CI runs once rather than once per action.
+    groups:
+      actions:
+        patterns: ['*']
   - package-ecosystem: docker
     directory: /
     schedule:

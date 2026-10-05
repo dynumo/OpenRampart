@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { apiCall, register } from '../e2e/helpers';
 
@@ -174,5 +175,23 @@ test('README screenshots', async ({ page, browser }) => {
   await expect(phone.getByRole('heading', { name: 'Timeline' })).toBeVisible();
   await shoot(phone, 'timeline-mobile-dark');
   await mobile.close();
+
+  // GitHub ignores CSS in READMEs, so two half-width images wrap or misalign. Join the Event
+  // and Incident pages into one image the same width as the timeline, with a transparent gap,
+  // at double resolution so the text stays sharp.
+  const png = (name: string) =>
+    `data:image/png;base64,${readFileSync(`${OUT}/${name}.png`).toString('base64')}`;
+  const sheet = await browser.newContext({ deviceScaleFactor: 2 });
+  const canvas = await sheet.newPage();
+  await canvas.setContent(
+    `<div id="pair" style="display:flex;gap:24px;width:1280px">
+      <img src="${png('event-light')}" style="width:628px">
+      <img src="${png('incident-light')}" style="width:628px">
+    </div>`,
+  );
+  await canvas
+    .locator('#pair')
+    .screenshot({ path: `${OUT}/event-and-incident-light.png`, omitBackground: true });
+  await sheet.close();
   void account;
 });

@@ -8,7 +8,8 @@ queries.
 
 - On start-up, the server applies any pending migrations before it serves requests. To run
   them as a separate step instead, set `OPENRAMPART_SKIP_MIGRATIONS=true` and use
-  `node dist/server/cli.js migrate` (or `npm run migrate`).
+  `node dist/server/cli.js migrate` (or `npm run migrate` from a source checkout; the container
+  image does not include npm).
 - Files are applied in filename order (`0001_initial.sql`, `0002_…`). Each runs in its own
   transaction, so a failing migration leaves the database as it was.
 - A PostgreSQL advisory lock makes concurrent runners wait. That makes it safe to start

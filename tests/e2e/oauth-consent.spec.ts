@@ -40,9 +40,7 @@ test('MCP client connects through OAuth consent; scopes and attachment contents 
   const { client_id } = await reg.json();
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
-  let callback: URL | null = null;
   await page.route('http://127.0.0.1:43123/**', async (route) => {
-    callback = new URL(route.request().url());
     await route.fulfill({
       status: 200,
       contentType: 'text/plain',
@@ -62,14 +60,20 @@ test('MCP client connects through OAuth consent; scopes and attachment contents 
   await expect(page.getByLabel(/Add and edit Events/)).not.toBeChecked();
   await expect(page.getByLabel(/See attachment details/)).toBeChecked();
   await expectAccessible(page, 'OAuth consent');
+  // Read the code from the server's redirect itself: newer Chromium builds may not follow a
+  // redirect from the app's origin to a loopback client address inside the test browser.
+  const redirected = page.waitForResponse((r) =>
+    (r.headers()['location'] ?? '').startsWith(REDIRECT),
+  );
   await page.getByRole('button', { name: 'Allow access' }).click();
-  await expect.poll(() => callback?.searchParams.get('code') ?? null).not.toBeNull();
-  expect(callback!.searchParams.get('state')).toBe('xyz');
+  const callback = new URL((await redirected).headers()['location']!);
+  expect(callback.searchParams.get('code')).not.toBeNull();
+  expect(callback.searchParams.get('state')).toBe('xyz');
 
   const tokenRes = await page.request.post('/oauth/token', {
     form: {
       grant_type: 'authorization_code',
-      code: callback!.searchParams.get('code')!,
+      code: callback.searchParams.get('code')!,
       redirect_uri: REDIRECT,
       client_id,
       code_verifier: verifier,

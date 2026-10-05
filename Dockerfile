@@ -29,7 +29,11 @@ RUN set -eux; \
       ocrmypdf ghostscript qpdf \
       poppler-utils \
       libheif-examples; \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/*; \
+    # The app runs with node alone. Drop the npm, npx and corepack copies bundled in the base
+    # image so their dependencies are not shipped (or flagged by image scanners).
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 
 ENV NODE_ENV=production \
     PORT=3000 \

@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "ci",
+      "credentials": [{ "accessKey": "openrampart", "secretKey": "openrampart-dev-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

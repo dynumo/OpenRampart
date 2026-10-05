@@ -1,0 +1,39 @@
+# Local development dependencies only: PostgreSQL and an S3-compatible store.
+# Run the app itself with `npm run dev` (see CONTRIBUTING.md).
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Matching settings are in .env.example (the "Local development" block).
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: openrampart
+      POSTGRES_PASSWORD: openrampart
+      POSTGRES_DB: openrampart
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - dev-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U openrampart']
+      interval: 5s
+      retries: 20
+
+  s3:
+    image: chrislusf/seaweedfs:latest
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        mkdir -p /etc/seaweedfs
+        printf '{"identities":[{"name":"dev","credentials":[{"accessKey":"openrampart","secretKey":"openrampart-dev-secret"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' > /etc/seaweedfs/s3.json
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - '127.0.0.1:8333:8333'
+    volumes:
+      - dev-s3:/data
+
+volumes:
+  dev-postgres:
+  dev-s3:

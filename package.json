@@ -28,7 +28,8 @@
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
-    "admin": "tsx src/server/cli.ts"
+    "admin": "tsx src/server/cli.ts",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",

@@ -12,6 +12,21 @@ It is built for anyone who ever needs to say "this is what happened, and when". 
 a benefits claim, a housing repair, a complaint, a debt, a dispute with an employer or a
 healthcare journey. It is also built for the people who help them.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/timeline-dark.png">
+  <img src="docs/images/timeline-light.png" alt="The OpenRampart timeline: Events grouped by month, each showing its date, title, type, Actor, and any risk level or due date." width="1280">
+</picture>
+
+<p>
+  <img src="docs/images/event-light.png" alt="An Event page for a decision letter, with its date, Actor, amount, notes, attachments and the Incident it belongs to." width="49%">
+  <img src="docs/images/incident-light.png" alt="An Incident page about damp and mould, with its status and a timeline of its six related Events." width="49%">
+</p>
+<p>
+  <img src="docs/images/timeline-mobile-dark.png" alt="The timeline on a phone in dark mode, with bottom navigation and a button to add an Event." width="260">
+</p>
+
+<sub>Screenshots use made-up data. Regenerate them with <code>npm run build && npm run screenshots</code>.</sub>
+
 ---
 
 ## What it does
@@ -107,6 +122,7 @@ OCR needs `tesseract`, `ocrmypdf`, `pdftotext`/`pdftoppm` (Poppler) and `heif-co
 | `npm run build`                               | Production build into `dist/`                                                                  |
 | `npm test`                                    | Unit and integration tests (needs PostgreSQL and S3 from dev compose)                          |
 | `npm run test:e2e`                            | Playwright end-to-end and axe accessibility tests (after `npm run build`)                      |
+| `npm run screenshots`                         | Regenerate the README screenshots in `docs/images` from made-up data (after `npm run build`)   |
 | `npm run typecheck` / `lint` / `format:check` | Static checks                                                                                  |
 | `npm run admin -- <command>`                  | Operator CLI (create-admin, reset-password, reset-totp, disable, enable, migrate, maintenance) |
 

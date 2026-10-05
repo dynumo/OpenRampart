@@ -83,6 +83,12 @@ OAuth token endpoint and `/mcp` use bearer tokens, not cookies, so CSRF does not
 
 Limits are stored in PostgreSQL, so they hold across restarts and replicas.
 
+Every request, on any route, also counts towards a coarse limit of 600 requests a minute per
+IP address. This guards the whole app against floods. It is held in memory, so each process
+counts separately and the count resets on restart; it is far above normal use.
+
+The limits below are stricter and apply to specific actions.
+
 | Limiter         | Key               | Allowance                              | Block after exceeding                 |
 | --------------- | ----------------- | -------------------------------------- | ------------------------------------- |
 | `loginIp`       | IP address        | 30 attempts / 15 minutes               | 15 minutes                            |

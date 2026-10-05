@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 import { findSession, touchSession } from '../auth/sessions.js';
 import type { User } from '../auth/accounts.js';
 import { config } from '../config.js';
@@ -75,6 +76,30 @@ export async function loadSession(req: Request, res: Response, next: NextFunctio
  * preflight that we never approve) and, when signed in, it must equal the
  * session's CSRF token. A present Origin header must be this application.
  */
+/**
+ * Coarse per-IP request limit applied to every route, so no handler can be hammered freely.
+ * It is held in memory (per process) to avoid a database write on every request; the stricter
+ * authentication limits in auth/rateLimit.ts are stored in PostgreSQL.
+ */
+const requestLimiter = new RateLimiterMemory({
+  keyPrefix: 'or_request',
+  points: 600,
+  duration: 60,
+});
+
+export async function requestRateLimit(req: Request, _res: Response, next: NextFunction) {
+  if (process.env.OPENRAMPART_DISABLE_RATE_LIMITS === 'true') return next();
+  try {
+    await requestLimiter.consume(req.ip ?? 'unknown');
+    next();
+  } catch (err) {
+    if (err instanceof RateLimiterRes) {
+      return next(new RateLimitedError(Math.max(1, Math.ceil(err.msBeforeNext / 1000))));
+    }
+    next(err);
+  }
+}
+
 export function csrfProtection(req: Request, res: Response, next: NextFunction) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   const origin = req.get('origin');

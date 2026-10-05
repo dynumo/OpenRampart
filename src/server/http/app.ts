@@ -14,6 +14,7 @@ import {
   errorHandler,
   loadSession,
   recordContext,
+  requestRateLimit,
   requireUser,
 } from './middleware.js';
 import { authRouter, invitationRouter } from './routes/auth.js';
@@ -98,6 +99,8 @@ export function createApp(opts: AppOptions = {}): Express {
     );
     next();
   });
+
+  app.use(requestRateLimit);
 
   // --- health
   app.get('/healthz', (_req, res) => {

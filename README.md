@@ -16,10 +16,13 @@ healthcare journey. It is also built for the people who help them.
   <img src="docs/images/timeline-light.png" alt="The OpenRampart timeline: Events grouped by month, each showing its date, title, type, Actor, and any risk level or due date." width="100%">
 </picture>
 
-<p>
-  <img src="docs/images/event-light.png" alt="An Event page for a decision letter, with its date, Actor, amount, notes, attachments and the Incident it belongs to." width="50%">
-  <img src="docs/images/incident-light.png" alt="An Incident page about damp and mould, with its status and a timeline of its six related Events." width="50%">
-</p>
+<picture>
+  <img src="docs/images/event-light.png" alt="An Event page for a decision letter, with its date, Actor, amount, notes, attachments and the Incident it belongs to." width="100%">
+</picture>
+
+<picture>
+  <img src="docs/images/incident-light.png" alt="An Incident page about damp and mould, with its status and a timeline of its six related Events." width="100%">
+</picture>
 
 <sub>Screenshots use made-up data. Regenerate them with <code>npm run build && npm run screenshots</code>.</sub>
 

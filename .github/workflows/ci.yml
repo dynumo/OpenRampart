@@ -21,7 +21,7 @@ jobs:
     name: Typecheck, lint, format
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -48,7 +48,7 @@ jobs:
           --health-cmd "pg_isready -U openrampart" --health-interval 5s --health-timeout 5s
           --health-retries 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Start S3-compatible storage (SeaweedFS)
         run: |
           docker run -d --name s3 -p 8333:8333 \
@@ -83,7 +83,7 @@ jobs:
           --health-cmd "pg_isready -U openrampart" --health-interval 5s --health-timeout 5s
           --health-retries 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Start S3-compatible storage (SeaweedFS)
         run: |
           docker run -d --name s3 -p 8333:8333 \
@@ -116,9 +116,9 @@ jobs:
     name: Container image builds
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           push: false

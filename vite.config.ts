@@ -12,7 +12,8 @@ export default defineConfig({
       manifest: {
         name: 'OpenRampart',
         short_name: 'OpenRampart',
-        description: 'Your own durable, searchable record of interactions with organisations and people.',
+        description:
+          'Your own durable, searchable record of interactions with organisations and people.',
         lang: 'en-GB',
         start_url: '/',
         scope: '/',
@@ -22,11 +23,26 @@ export default defineConfig({
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          {
+            src: '/icons/maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
         shortcuts: [
-          { name: 'Capture a letter', short_name: 'Capture', url: '/events/new/letter', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
-          { name: 'Add Event', short_name: 'Add', url: '/events/new', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          {
+            name: 'Capture a letter',
+            short_name: 'Capture',
+            url: '/events/new/letter',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+          },
+          {
+            name: 'Add Event',
+            short_name: 'Add',
+            url: '/events/new',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+          },
         ],
       },
       workbox: {
@@ -34,7 +50,14 @@ export default defineConfig({
         // previews are always fetched from the server and never stored offline.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/oauth\//, /^\/mcp/, /^\/\.well-known\//, /^\/healthz/, /^\/readyz/],
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/oauth\//,
+          /^\/mcp/,
+          /^\/\.well-known\//,
+          /^\/healthz/,
+          /^\/readyz/,
+        ],
         runtimeCaching: [],
         cleanupOutdatedCaches: true,
       },

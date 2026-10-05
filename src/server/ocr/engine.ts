@@ -44,7 +44,9 @@ async function cmd(file: string, args: string[], timeoutSeconds: number, cwd?: s
 
 const versionCache = new Map<string, string | null>();
 
-export async function toolVersion(tool: 'tesseract' | 'ocrmypdf' | 'pdftotext' | 'pdftoppm' | 'heif-convert'): Promise<string | null> {
+export async function toolVersion(
+  tool: 'tesseract' | 'ocrmypdf' | 'pdftotext' | 'pdftoppm' | 'heif-convert',
+): Promise<string | null> {
   if (versionCache.has(tool)) return versionCache.get(tool)!;
   let version: string | null = null;
   try {
@@ -55,8 +57,15 @@ export async function toolVersion(tool: 'tesseract' | 'ocrmypdf' | 'pdftotext' |
       const { stdout } = await run('ocrmypdf', ['--version'], { timeout: 20_000 });
       version = String(stdout).trim().split(/\s/)[0] ?? 'unknown';
     } else if (tool === 'heif-convert') {
-      const out = await run('heif-convert', ['--version'], { timeout: 10_000 }).catch((e: { stdout?: string; stderr?: string }) => ({ stdout: e.stdout ?? '', stderr: e.stderr ?? '' }));
-      version = /libheif version:\s*([\d.]+)/.exec(String(out.stdout) + String(out.stderr))?.[1] ?? 'unknown';
+      const out = await run('heif-convert', ['--version'], { timeout: 10_000 }).catch(
+        (e: { stdout?: string; stderr?: string }) => ({
+          stdout: e.stdout ?? '',
+          stderr: e.stderr ?? '',
+        }),
+      );
+      version =
+        /libheif version:\s*([\d.]+)/.exec(String(out.stdout) + String(out.stderr))?.[1] ??
+        'unknown';
     } else {
       const { stdout, stderr } = await run(tool, ['-v'], { timeout: 10_000 });
       version = /version\s+([\d.]+)/.exec(String(stdout) + String(stderr))?.[1] ?? 'unknown';
@@ -69,8 +78,15 @@ export async function toolVersion(tool: 'tesseract' | 'ocrmypdf' | 'pdftotext' |
 }
 
 export async function ocrImage(imagePath: string, opts: OcrOptions): Promise<OcrResult> {
-  const text = await cmd('tesseract', [imagePath, 'stdout', '-l', opts.languages, '--psm', '3'], opts.timeoutSeconds);
-  return { text: text.slice(0, MAX_TEXT), engine: `tesseract ${(await toolVersion('tesseract')) ?? ''}`.trim() };
+  const text = await cmd(
+    'tesseract',
+    [imagePath, 'stdout', '-l', opts.languages, '--psm', '3'],
+    opts.timeoutSeconds,
+  );
+  return {
+    text: text.slice(0, MAX_TEXT),
+    engine: `tesseract ${(await toolVersion('tesseract')) ?? ''}`.trim(),
+  };
 }
 
 export async function pdfPageCount(pdfPath: string): Promise<number | null> {
@@ -84,7 +100,9 @@ export async function pdfPageCount(pdfPath: string): Promise<number | null> {
 }
 
 export async function pdfEmbeddedText(pdfPath: string, maxPages: number): Promise<string> {
-  return (await cmd('pdftotext', ['-layout', '-l', String(maxPages), '-enc', 'UTF-8', pdfPath, '-'], 120)).slice(0, MAX_TEXT);
+  return (
+    await cmd('pdftotext', ['-layout', '-l', String(maxPages), '-enc', 'UTF-8', pdfPath, '-'], 120)
+  ).slice(0, MAX_TEXT);
 }
 
 /** Whether embedded text looks like a real text layer rather than a scan. */
@@ -93,7 +111,12 @@ export function hasUsefulText(text: string, pages: number): boolean {
   return chars >= Math.max(40, 25 * Math.max(pages, 1));
 }
 
-export async function ocrPdf(pdfPath: string, workDir: string, opts: OcrOptions, pages: number | null): Promise<OcrResult> {
+export async function ocrPdf(
+  pdfPath: string,
+  workDir: string,
+  opts: OcrOptions,
+  pages: number | null,
+): Promise<OcrResult> {
   const sidecar = path.join(workDir, 'sidecar.txt');
   const args = [
     '--force-ocr',
@@ -121,7 +144,11 @@ export async function ocrPdf(pdfPath: string, workDir: string, opts: OcrOptions,
 }
 
 export async function renderPdfFirstPage(pdfPath: string, outPrefix: string): Promise<string> {
-  await cmd('pdftoppm', ['-f', '1', '-l', '1', '-r', '110', '-png', '-singlefile', pdfPath, outPrefix], 120);
+  await cmd(
+    'pdftoppm',
+    ['-f', '1', '-l', '1', '-r', '110', '-png', '-singlefile', pdfPath, outPrefix],
+    120,
+  );
   return `${outPrefix}.png`;
 }
 

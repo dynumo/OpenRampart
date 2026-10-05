@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test';
 import { createEventViaUi, expectAccessible, newSignedInContext, register } from './helpers';
 
 test.describe('Recording Events, Actors and Incidents', () => {
-  test('create Events and Actors, browse the Actor timeline, group into an Incident, search', async ({ page }) => {
+  test('create Events and Actors, browse the Actor timeline, group into an Incident, search', async ({
+    page,
+  }) => {
     await register(page);
     await expectAccessible(page, 'empty timeline');
     await page.goto('/events/new');
@@ -10,10 +12,29 @@ test.describe('Recording Events, Actors and Incidents', () => {
     await page.goto('/events/new/payment');
     await expectAccessible(page, 'event form');
 
-    const paid = await createEventViaUi(page, { type: 'payment', title: 'Payment made to Barclaycard', date: '2026-09-12', actor: 'Barclaycard', newActor: true, notes: 'Paid 250 pounds by bank transfer.' });
+    const paid = await createEventViaUi(page, {
+      type: 'payment',
+      title: 'Payment made to Barclaycard',
+      date: '2026-09-12',
+      actor: 'Barclaycard',
+      newActor: true,
+      notes: 'Paid 250 pounds by bank transfer.',
+    });
     await expectAccessible(page, 'event detail');
-    await createEventViaUi(page, { type: 'observation', title: 'Payment missing from statement', date: '2026-09-15', actor: 'Barclaycard', notes: 'Online banking shows the September payment as missing.' });
-    await createEventViaUi(page, { type: 'portal', title: 'Login unavailable', date: '2026-03-24', actor: 'Companies House', newActor: true });
+    await createEventViaUi(page, {
+      type: 'observation',
+      title: 'Payment missing from statement',
+      date: '2026-09-15',
+      actor: 'Barclaycard',
+      notes: 'Online banking shows the September payment as missing.',
+    });
+    await createEventViaUi(page, {
+      type: 'portal',
+      title: 'Login unavailable',
+      date: '2026-03-24',
+      actor: 'Companies House',
+      newActor: true,
+    });
 
     // Global timeline shows everything with month grouping.
     await page.goto('/');
@@ -40,7 +61,9 @@ test.describe('Recording Events, Actors and Incidents', () => {
     await page.goto('/incidents/new');
     await page.getByLabel('Title').fill('Incorrect credit card arrears');
     await page.getByRole('button', { name: 'Create Incident' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Incorrect credit card arrears' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Incorrect credit card arrears' }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Add existing Events' }).click();
     await page.getByLabel(/Payment made to Barclaycard/).check();
     await page.getByLabel(/Payment missing from statement/).check();
@@ -68,7 +91,9 @@ test.describe('Recording Events, Actors and Incidents', () => {
     await page.goto(`/events/${paid}/edit`);
     await page.getByLabel('Title').fill('Payment of £250 made to Barclaycard');
     await page.getByRole('button', { name: 'Save changes' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Payment of £250 made to Barclaycard' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Payment of £250 made to Barclaycard' }),
+    ).toBeVisible();
     await page.getByText('Revision history (2)').click();
     await expect(page.getByText('Revision 1')).toBeVisible();
   });

@@ -37,11 +37,23 @@ export async function runMaintenance(): Promise<Record<string, number>> {
     try {
       await deleteObject(f.storage_key);
       await deletePrefix(`derived/${f.owner_id}/${f.id}/`);
-      await db().execute(sql`DELETE FROM timestamp_proofs WHERE subject_type = 'attachment' AND subject_id = ${f.id}::uuid`);
+      await db().execute(
+        sql`DELETE FROM timestamp_proofs WHERE subject_type = 'attachment' AND subject_id = ${f.id}::uuid`,
+      );
       await db().execute(sql`DELETE FROM attachments WHERE id = ${f.id}::uuid`);
-      await audit({ action: 'attachment.deleted', ownerId: f.owner_id, via: 'system', targetType: 'attachment', targetId: f.id, metadata: { permanent: true } });
+      await audit({
+        action: 'attachment.deleted',
+        ownerId: f.owner_id,
+        via: 'system',
+        targetType: 'attachment',
+        targetId: f.id,
+        metadata: { permanent: true },
+      });
     } catch (err) {
-      logger.warn({ attachmentId: f.id, err: (err as Error).message }, 'could not purge attachment');
+      logger.warn(
+        { attachmentId: f.id, err: (err as Error).message },
+        'could not purge attachment',
+      );
     }
   }
   stats.attachmentsPurged = expiredFiles.length;
@@ -51,8 +63,16 @@ export async function runMaintenance(): Promise<Record<string, number>> {
       AND NOT EXISTS (SELECT 1 FROM attachments a WHERE a.event_id = events.id)
     RETURNING id, owner_id`);
   for (const e of purgedEvents) {
-    await db().execute(sql`DELETE FROM timestamp_proofs WHERE subject_type = 'event_revision' AND subject_id NOT IN (SELECT id FROM event_revisions)`);
-    await audit({ action: 'event.purged', ownerId: e.owner_id, via: 'system', targetType: 'event', targetId: e.id });
+    await db().execute(
+      sql`DELETE FROM timestamp_proofs WHERE subject_type = 'event_revision' AND subject_id NOT IN (SELECT id FROM event_revisions)`,
+    );
+    await audit({
+      action: 'event.purged',
+      ownerId: e.owner_id,
+      via: 'system',
+      targetType: 'event',
+      targetId: e.id,
+    });
   }
   stats.eventsPurged = purgedEvents.length;
 
@@ -61,7 +81,14 @@ export async function runMaintenance(): Promise<Record<string, number>> {
       AND NOT EXISTS (SELECT 1 FROM attachments a WHERE a.incident_id = incidents.id)
     RETURNING id, owner_id`);
   for (const i of purgedIncidents) {
-    await audit({ action: 'incident.deleted', ownerId: i.owner_id, via: 'system', targetType: 'incident', targetId: i.id, metadata: { permanent: true } });
+    await audit({
+      action: 'incident.deleted',
+      ownerId: i.owner_id,
+      via: 'system',
+      targetType: 'incident',
+      targetId: i.id,
+      metadata: { permanent: true },
+    });
   }
   stats.incidentsPurged = purgedIncidents.length;
 
@@ -73,10 +100,16 @@ export async function runMaintenance(): Promise<Record<string, number>> {
   stats.actorsPurged = purgedActors.length;
 
   stats.sessionsPruned = await pruneSessions();
-  const oauth = await db().execute(sql`DELETE FROM oauth_payloads WHERE expires_at IS NOT NULL AND expires_at < now() - interval '1 day'`);
+  const oauth = await db().execute(
+    sql`DELETE FROM oauth_payloads WHERE expires_at IS NOT NULL AND expires_at < now() - interval '1 day'`,
+  );
   stats.oauthPruned = oauth.rowCount ?? 0;
-  await db().execute(sql`DELETE FROM password_reset_tokens WHERE expires_at < now() - interval '7 days'`);
-  await db().execute(sql`DELETE FROM rate_limits WHERE expire IS NOT NULL AND expire < (extract(epoch from now()) * 1000)::bigint`);
+  await db().execute(
+    sql`DELETE FROM password_reset_tokens WHERE expires_at < now() - interval '7 days'`,
+  );
+  await db().execute(
+    sql`DELETE FROM rate_limits WHERE expire IS NOT NULL AND expire < (extract(epoch from now()) * 1000)::bigint`,
+  );
 
   stats.tempFilesRemoved = await cleanTempUploads();
 

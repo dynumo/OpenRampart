@@ -4,7 +4,13 @@ import { toNodeHandler } from '@modelcontextprotocol/node';
 import { z } from 'zod';
 import * as rate from '../../auth/rateLimit.js';
 import { config } from '../../config.js';
-import { approveInteraction, DEFAULT_SCOPES, denyInteraction, describeInteraction, verifyAccessToken } from '../../oauth/connections.js';
+import {
+  approveInteraction,
+  DEFAULT_SCOPES,
+  denyInteraction,
+  describeInteraction,
+  verifyAccessToken,
+} from '../../oauth/connections.js';
 import { getProvider, INTERACTION_PATH, OAUTH_MOUNT } from '../../oauth/provider.js';
 import { authInfoFor, mcpHandler, protectedResourceMetadataUrl } from '../../mcp/server.js';
 import { OAUTH_SCOPES } from '../../../shared/scopes.js';
@@ -18,12 +24,20 @@ export function interactionRouter(): ExpressRouter {
     res.json(await describeInteraction(req, res, locals(res).user!.id));
   });
   r.post('/:uid/approve', requireUser, csrfProtection, async (req, res) => {
-    const input = z.object({ ownerId: z.string().uuid(), scopes: z.array(z.string()).max(20) }).parse(req.body);
-    const redirectTo = await approveInteraction(req, res, { userId: locals(res).user!.id, ...input, ...requestMeta(req) });
+    const input = z
+      .object({ ownerId: z.string().uuid(), scopes: z.array(z.string()).max(20) })
+      .parse(req.body);
+    const redirectTo = await approveInteraction(req, res, {
+      userId: locals(res).user!.id,
+      ...input,
+      ...requestMeta(req),
+    });
     res.json({ redirectTo });
   });
   r.post('/:uid/deny', requireUser, csrfProtection, async (req, res) => {
-    res.json({ redirectTo: await denyInteraction(req, res, locals(res).user!.id, requestMeta(req)) });
+    res.json({
+      redirectTo: await denyInteraction(req, res, locals(res).user!.id, requestMeta(req)),
+    });
   });
   return r;
 }
@@ -47,7 +61,10 @@ export async function oauthProvider(req: Request, res: Response, next: NextFunct
     provider.callback()(req, res);
   } catch (err) {
     if (err instanceof RateLimitedError) {
-      res.set('Retry-After', String(err.retryAfterSeconds)).status(429).json({ error: 'slow_down', error_description: err.message });
+      res
+        .set('Retry-After', String(err.retryAfterSeconds))
+        .status(429)
+        .json({ error: 'slow_down', error_description: err.message });
       return;
     }
     next(err);
@@ -83,15 +100,22 @@ export function protectedResourceMetadata(_req: Request, res: Response) {
 }
 
 function challenge(res: Response, status: 401 | 403, params: Record<string, string>) {
-  const parts = [`resource_metadata="${protectedResourceMetadataUrl()}"`, ...Object.entries(params).map(([k, v]) => `${k}="${v.replace(/"/g, "'")}"`)];
+  const parts = [
+    `resource_metadata="${protectedResourceMetadataUrl()}"`,
+    ...Object.entries(params).map(([k, v]) => `${k}="${v.replace(/"/g, "'")}"`),
+  ];
   res.set('WWW-Authenticate', `Bearer ${parts.join(', ')}`);
-  res.status(status).json({ error: params.error ?? 'unauthorized', error_description: params.error_description ?? 'Authorisation required' });
+  res.status(status).json({
+    error: params.error ?? 'unauthorized',
+    error_description: params.error_description ?? 'Authorisation required',
+  });
 }
 
 const MCP_CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, Mcp-Protocol-Version, Mcp-Session-Id, Mcp-Method, Last-Event-ID',
+  'Access-Control-Allow-Headers':
+    'Authorization, Content-Type, Accept, Mcp-Protocol-Version, Mcp-Session-Id, Mcp-Method, Last-Event-ID',
   'Access-Control-Expose-Headers': 'WWW-Authenticate, Mcp-Session-Id, Mcp-Protocol-Version',
   'Access-Control-Max-Age': '600',
 };
@@ -108,12 +132,17 @@ export async function mcpEndpoint(req: Request, res: Response, next: NextFunctio
   // DNS-rebinding protection: the Host must be this server.
   const host = req.get('host');
   if (host && host.toLowerCase() !== new URL(config().mcpResourceUrl).host.toLowerCase()) {
-    return void res.status(403).json({ error: 'forbidden', error_description: 'Unexpected Host header' });
+    return void res
+      .status(403)
+      .json({ error: 'forbidden', error_description: 'Unexpected Host header' });
   }
   const header = req.get('authorization') ?? '';
   const match = /^Bearer\s+([A-Za-z0-9\-._~+/]+=*)$/i.exec(header);
   if (!match) {
-    return challenge(res, 401, { scope: DEFAULT_SCOPES.join(' '), error_description: 'Authorisation required' });
+    return challenge(res, 401, {
+      scope: DEFAULT_SCOPES.join(' '),
+      error_description: 'Authorisation required',
+    });
   }
   try {
     const verified = await verifyAccessToken(match[1]!);

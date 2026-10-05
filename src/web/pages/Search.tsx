@@ -19,12 +19,19 @@ export function SearchPage() {
   const record = useRecord();
   const tz = record.data?.timezone ?? 'Europe/London';
   useEffect(() => setDraft(q), [q]);
-  const result = useQuery({ queryKey: ['search', q], queryFn: () => api<Result>('/search', { query: { q } }), enabled: q.trim().length > 0 });
+  const result = useQuery({
+    queryKey: ['search', q],
+    queryFn: () => api<Result>('/search', { query: { q } }),
+    enabled: q.trim().length > 0,
+  });
   const r = result.data;
   const total = r ? r.totals.events + r.totals.actors + r.totals.incidents + r.totals.documents : 0;
   return (
     <>
-      <PageHeader title="Search" lede="Search Events, Actors, Incidents and the text of your documents." />
+      <PageHeader
+        title="Search"
+        lede="Search Events, Actors, Incidents and the text of your documents."
+      />
       <form
         role="search"
         onSubmit={(e) => {
@@ -36,7 +43,13 @@ export function SearchPage() {
       >
         <div className="field" style={{ flex: '1 1 20rem', marginBottom: 0 }}>
           <label htmlFor="search-q">Search for</label>
-          <input id="search-q" type="search" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="e.g. Companies House login" />
+          <input
+            id="search-q"
+            type="search"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="e.g. Companies House login"
+          />
         </div>
         <button className="btn btn-primary" type="submit">
           Search
@@ -47,7 +60,9 @@ export function SearchPage() {
       {r ? (
         <div role="status" aria-live="polite">
           <p>
-            {total ? `${total} result${total === 1 ? '' : 's'} for “${r.query}”.` : `Nothing found for “${r.query}”.`}
+            {total
+              ? `${total} result${total === 1 ? '' : 's'} for “${r.query}”.`
+              : `Nothing found for “${r.query}”.`}
             {r.correctedQuery ? ` Including results for “${r.correctedQuery}”.` : ''}
           </p>
         </div>
@@ -75,7 +90,8 @@ export function SearchPage() {
           <ul className="plain-list">
             {r.incidents.map((i) => (
               <li key={i.id}>
-                <Link to={`/incidents/${i.id}`}>{i.title}</Link> <span className="muted small">({i.status})</span>
+                <Link to={`/incidents/${i.id}`}>{i.title}</Link>{' '}
+                <span className="muted small">({i.status})</span>
                 {i.snippet ? (
                   <div className="small">
                     <Highlight snippet={i.snippet} />
@@ -96,7 +112,9 @@ export function SearchPage() {
           </ul>
           {r.totals.events > r.events.length ? (
             <p>
-              <Link to={`/?q=${encodeURIComponent(r.correctedQuery ?? r.query)}`}>See all {r.totals.events} matching Events on the timeline</Link>
+              <Link to={`/?q=${encodeURIComponent(r.correctedQuery ?? r.query)}`}>
+                See all {r.totals.events} matching Events on the timeline
+              </Link>
             </p>
           ) : null}
         </section>
@@ -107,7 +125,8 @@ export function SearchPage() {
           <ul className="plain-list">
             {r.documents.map((d) => (
               <li key={d.attachmentId}>
-                <Link to={`/attachments/${d.attachmentId}`}>{d.filename}</Link> <span className="muted small">in {d.parentTitle}</span>
+                <Link to={`/attachments/${d.attachmentId}`}>{d.filename}</Link>{' '}
+                <span className="muted small">in {d.parentTitle}</span>
                 {d.snippet ? (
                   <div className="small">
                     <Highlight snippet={d.snippet} />

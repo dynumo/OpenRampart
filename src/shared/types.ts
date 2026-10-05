@@ -33,7 +33,14 @@ export interface UserRef {
 
 /** An Actor as shown on an Event. Redacted links carry no identifying data. */
 export type EventActorDTO =
-  | { redacted: false; id: string; name: string; kind: ActorKind; role: string | null; fullAccess: boolean }
+  | {
+      redacted: false;
+      id: string;
+      name: string;
+      kind: ActorKind;
+      role: string | null;
+      fullAccess: boolean;
+    }
   | { redacted: true; role: null };
 
 export interface IncidentRef {

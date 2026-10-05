@@ -22,6 +22,8 @@ async function main() {
     c = config();
   } catch (err) {
     if (err instanceof ConfigError) {
+      // The logger is not configured yet; configuration problems go straight to stderr.
+      // eslint-disable-next-line no-console
       console.error(err.message);
       process.exit(78);
     }
@@ -29,18 +31,27 @@ async function main() {
   }
   logger.info({ role: c.OPENRAMPART_ROLE, appUrl: c.APP_URL }, 'starting OpenRampart');
 
-  await getPool().query('SELECT 1').catch((err: Error) => {
-    throw new Error(`Cannot connect to PostgreSQL (DATABASE_URL): ${err.message}`);
-  });
+  await getPool()
+    .query('SELECT 1')
+    .catch((err: Error) => {
+      throw new Error(`Cannot connect to PostgreSQL (DATABASE_URL): ${err.message}`);
+    });
   if (process.env.OPENRAMPART_SKIP_MIGRATIONS !== 'true') {
     const result = await runMigrations(getPool());
-    if (result.applied.length) logger.info({ applied: result.applied }, 'database migrations applied');
+    if (result.applied.length)
+      logger.info({ applied: result.applied }, 'database migrations applied');
   }
   await ensureBucket();
 
   if (c.OCR_ENABLED && c.OPENRAMPART_ROLE !== 'web') {
-    const [tesseract, ocrmypdf] = await Promise.all([toolVersion('tesseract'), toolVersion('ocrmypdf')]);
-    if (!tesseract) logger.warn('tesseract was not found: image OCR will fail. Install tesseract-ocr or set OCR_ENABLED=false.');
+    const [tesseract, ocrmypdf] = await Promise.all([
+      toolVersion('tesseract'),
+      toolVersion('ocrmypdf'),
+    ]);
+    if (!tesseract)
+      logger.warn(
+        'tesseract was not found: image OCR will fail. Install tesseract-ocr or set OCR_ENABLED=false.',
+      );
     if (!ocrmypdf) logger.warn('ocrmypdf was not found: scanned PDF OCR will fail.');
   }
 
@@ -52,7 +63,11 @@ async function main() {
     let devMiddleware;
     if (c.NODE_ENV === 'development') {
       const { createServer: createVite } = await import('vite');
-      const vite = await createVite({ server: { middlewareMode: true }, appType: 'spa', root: process.cwd() });
+      const vite = await createVite({
+        server: { middlewareMode: true },
+        appType: 'spa',
+        root: process.cwd(),
+      });
       devMiddleware = vite.middlewares;
     }
     const app = createApp({ devMiddleware, webRoot: path.resolve(process.cwd(), 'dist/web') });
@@ -78,6 +93,7 @@ async function main() {
 
 main().catch((err) => {
   logger.fatal({ err: (err as Error).message }, 'OpenRampart failed to start');
+  // eslint-disable-next-line no-console
   console.error((err as Error).message);
   process.exit(1);
 });

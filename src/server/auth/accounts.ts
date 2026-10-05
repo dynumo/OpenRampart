@@ -76,7 +76,9 @@ export function isValidTimezone(tz: string): boolean {
 }
 
 async function userCount(): Promise<number> {
-  const [row] = await db().select({ n: sql<number>`count(*)::int` }).from(users);
+  const [row] = await db()
+    .select({ n: sql<number>`count(*)::int` })
+    .from(users);
   return row?.n ?? 0;
 }
 
@@ -111,11 +113,14 @@ export async function createAccount(
   if (!USERNAME_RE.test(username)) {
     fields.username = 'Use 3–64 letters, numbers, dots, hyphens or underscores.';
   }
-  if (email && (!EMAIL_RE.test(email) || email.length > 320)) fields.email = 'Enter a valid email address.';
-  if (!displayName || displayName.length > 120) fields.displayName = 'Enter a name of up to 120 characters.';
+  if (email && (!EMAIL_RE.test(email) || email.length > 320))
+    fields.email = 'Enter a valid email address.';
+  if (!displayName || displayName.length > 120)
+    fields.displayName = 'Enter a name of up to 120 characters.';
   const timezone = input.timezone?.trim() || 'Europe/London';
   if (!isValidTimezone(timezone)) fields.timezone = 'Choose a valid time zone.';
-  if (Object.keys(fields).length) throw new ValidationError('Please correct the highlighted fields', fields);
+  if (Object.keys(fields).length)
+    throw new ValidationError('Please correct the highlighted fields', fields);
   validatePassword(input.password, { username, email });
 
   const status = await registrationStatus();
@@ -128,7 +133,9 @@ export async function createAccount(
     const created = await db().transaction(async (tx) => {
       // Serialise first-account creation so two simultaneous sign-ups cannot both become admin.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(7314201002)`);
-      const [{ n }] = (await tx.select({ n: sql<number>`count(*)::int` }).from(users)) as [{ n: number }];
+      const [{ n }] = (await tx.select({ n: sql<number>`count(*)::int` }).from(users)) as [
+        { n: number },
+      ];
       const [user] = await tx
         .insert(users)
         .values({
@@ -183,7 +190,11 @@ export interface LoginResult {
 }
 
 /** Step one: username/email + password. */
-export async function loginWithPassword(login: string, password: string, meta: SessionMeta): Promise<LoginResult> {
+export async function loginWithPassword(
+  login: string,
+  password: string,
+  meta: SessionMeta,
+): Promise<LoginResult> {
   const ipKey = meta.ip ?? 'unknown';
   await rate.hit('loginIp', ipKey);
   await rate.assertNotBlocked('loginAccount', login);
@@ -218,13 +229,22 @@ export async function loginWithPassword(login: string, password: string, meta: S
     try {
       await rate.hit('loginAccount', login);
     } catch (err) {
-      await audit({ action: 'auth.locked', outcome: 'failure', ownerId: user.id, ip: meta.ip, userAgent: meta.userAgent });
+      await audit({
+        action: 'auth.locked',
+        outcome: 'failure',
+        ownerId: user.id,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
       throw err;
     }
     throw new UnauthenticatedError('The username, email or password is not correct');
   }
   if (needsRehash(user.passwordHash)) {
-    await db().update(users).set({ passwordHash: await hashPassword(password) }).where(eq(users.id, user.id));
+    await db()
+      .update(users)
+      .set({ passwordHash: await hashPassword(password) })
+      .where(eq(users.id, user.id));
   }
   let stage: LoginResult['stage'];
   if (user.totpEnabledAt) stage = 'mfa';
@@ -235,7 +255,11 @@ export async function loginWithPassword(login: string, password: string, meta: S
   return { token, stage, user };
 }
 
-async function completeLogin(user: User, meta: SessionMeta, method: 'totp' | 'recovery_code' | null) {
+async function completeLogin(
+  user: User,
+  meta: SessionMeta,
+  method: 'totp' | 'recovery_code' | null,
+) {
   await db()
     .update(users)
     .set({
@@ -257,7 +281,13 @@ async function completeLogin(user: User, meta: SessionMeta, method: 'totp' | 're
     userAgent: meta.userAgent,
     metadata: { method: method ?? 'password' },
   });
-  await audit({ action: 'session.created', ownerId: user.id, actorUserId: user.id, ip: meta.ip, userAgent: meta.userAgent });
+  await audit({
+    action: 'session.created',
+    ownerId: user.id,
+    actorUserId: user.id,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
 }
 
 /**
@@ -276,7 +306,10 @@ export async function verifySecondFactor(
     const result = await checkTotp(decryptSecret(user.totpSecretEnc), code, user.totpLastStep);
     if (result.valid) {
       method = 'totp';
-      await db().update(users).set({ totpLastStep: result.timeStep ?? null }).where(eq(users.id, user.id));
+      await db()
+        .update(users)
+        .set({ totpLastStep: result.timeStep ?? null })
+        .where(eq(users.id, user.id));
     }
   } else if (looksLikeRecoveryCode(code) && (await consumeRecoveryCode(user.id, code))) {
     method = 'recovery_code';
@@ -290,7 +323,9 @@ export async function verifySecondFactor(
       ip: meta.ip,
       userAgent: meta.userAgent,
     });
-    throw new UnauthenticatedError('That code is not correct. Check your authenticator app and try again.');
+    throw new UnauthenticatedError(
+      'That code is not correct. Check your authenticator app and try again.',
+    );
   }
   await rate.reset('mfa', user.id).catch(() => undefined);
   await revokeSession(mfaSessionId, 'mfa_completed');
@@ -324,7 +359,10 @@ export async function verifySecondFactor(
 /** Begin (or restart) TOTP enrolment. The secret stays pending until confirmed. */
 export async function beginTotpSetup(user: User) {
   const secret = newTotpSecret();
-  await db().update(users).set({ totpPendingSecretEnc: encryptSecret(secret) }).where(eq(users.id, user.id));
+  await db()
+    .update(users)
+    .set({ totpPendingSecretEnc: encryptSecret(secret) })
+    .where(eq(users.id, user.id));
   const uri = totpUri(secret, user.email ?? user.username);
   return {
     uri,
@@ -352,10 +390,15 @@ export async function confirmTotpSetup(
         currentCode: 'Enter a code from your existing authenticator app.',
       });
     }
-    const current = await checkTotp(decryptSecret(user.totpSecretEnc), opts.currentCode, user.totpLastStep);
-    if (!current.valid) throw new ValidationError('The code from your current authenticator is not correct', {
-      currentCode: 'That code is not correct.',
-    });
+    const current = await checkTotp(
+      decryptSecret(user.totpSecretEnc),
+      opts.currentCode,
+      user.totpLastStep,
+    );
+    if (!current.valid)
+      throw new ValidationError('The code from your current authenticator is not correct', {
+        currentCode: 'That code is not correct.',
+      });
   }
   const secret = decryptSecret(user.totpPendingSecretEnc);
   const result = await checkTotp(secret, code);
@@ -394,7 +437,8 @@ export async function confirmTotpSetup(
       }),
     );
   }
-  if (opts.currentSessionId) await revokeAllSessions(user.id, 'totp_changed', opts.currentSessionId);
+  if (opts.currentSessionId)
+    await revokeAllSessions(user.id, 'totp_changed', opts.currentSessionId);
   return { recoveryCodes };
 }
 
@@ -425,10 +469,20 @@ async function requireReauth(user: User, password: string, meta: SessionMeta): P
   }
 }
 
-export async function newRecoveryCodes(user: User, password: string, meta: SessionMeta): Promise<string[]> {
+export async function newRecoveryCodes(
+  user: User,
+  password: string,
+  meta: SessionMeta,
+): Promise<string[]> {
   await requireReauth(user, password, meta);
   const codes = await regenerateRecoveryCodes(user.id);
-  await audit({ action: 'auth.recovery_codes_regenerated', ownerId: user.id, actorUserId: user.id, ip: meta.ip, userAgent: meta.userAgent });
+  await audit({
+    action: 'auth.recovery_codes_regenerated',
+    ownerId: user.id,
+    actorUserId: user.id,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
   return codes;
 }
 
@@ -442,17 +496,28 @@ export async function changePassword(
   validatePassword(newPassword, { username: user.username, email: user.email });
   await db()
     .update(users)
-    .set({ passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date(), updatedAt: new Date() })
+    .set({
+      passwordHash: await hashPassword(newPassword),
+      passwordChangedAt: new Date(),
+      updatedAt: new Date(),
+    })
     .where(eq(users.id, user.id));
   await revokeAllSessions(user.id, 'password_changed');
   const { token } = await createSession(user.id, 'active', meta, null);
-  await audit({ action: 'auth.password_changed', ownerId: user.id, actorUserId: user.id, ip: meta.ip, userAgent: meta.userAgent });
+  await audit({
+    action: 'auth.password_changed',
+    ownerId: user.id,
+    actorUserId: user.id,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
   if (user.email) {
     await sendNotification(
       securityNotificationEmail({
         to: user.email,
         summary: 'password changed',
-        detail: 'The password for your OpenRampart account was changed and other sessions were signed out.',
+        detail:
+          'The password for your OpenRampart account was changed and other sessions were signed out.',
         url: `${config().APP_URL}/settings/security`,
       }),
     );
@@ -480,12 +545,14 @@ export async function updateProfile(
     if (!isValidTimezone(input.timezone)) fields.timezone = 'Choose a valid time zone.';
     patch.timezone = input.timezone;
   }
-  if (Object.keys(fields).length) throw new ValidationError('Please correct the highlighted fields', fields);
+  if (Object.keys(fields).length)
+    throw new ValidationError('Please correct the highlighted fields', fields);
   try {
     const [updated] = await db().update(users).set(patch).where(eq(users.id, user.id)).returning();
     return updated!;
   } catch (err) {
-    if (pgErrorCode(err) === '23505') throw new ConflictError('That email address is already in use');
+    if (pgErrorCode(err) === '23505')
+      throw new ConflictError('That email address is already in use');
     throw err;
   }
 }
@@ -498,12 +565,27 @@ export async function requestPasswordReset(login: string, meta: SessionMeta): Pr
   const token = randomToken(32);
   await db()
     .insert(passwordResetTokens)
-    .values({ userId: user.id, tokenHash: tokenHash(token, 'password-reset'), expiresAt: new Date(Date.now() + 3600_000) });
-  await audit({ action: 'auth.password_reset_requested', ownerId: user.id, ip: meta.ip, userAgent: meta.userAgent });
-  await sendMail(passwordResetEmail({ to: user.email, url: `${config().APP_URL}/reset-password/${token}` }));
+    .values({
+      userId: user.id,
+      tokenHash: tokenHash(token, 'password-reset'),
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+  await audit({
+    action: 'auth.password_reset_requested',
+    ownerId: user.id,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
+  await sendMail(
+    passwordResetEmail({ to: user.email, url: `${config().APP_URL}/reset-password/${token}` }),
+  );
 }
 
-export async function completePasswordReset(token: string, newPassword: string, meta: SessionMeta): Promise<void> {
+export async function completePasswordReset(
+  token: string,
+  newPassword: string,
+  meta: SessionMeta,
+): Promise<void> {
   await rate.hit('passwordReset', meta.ip ?? 'unknown');
   const now = new Date();
   const [row] = await db()
@@ -517,24 +599,41 @@ export async function completePasswordReset(token: string, newPassword: string, 
       ),
     )
     .returning();
-  if (!row) throw new ValidationError('This reset link is invalid or has expired. Request a new one.');
+  if (!row)
+    throw new ValidationError('This reset link is invalid or has expired. Request a new one.');
   const user = await getUser(row.userId);
-  if (!user || user.disabledAt) throw new ValidationError('This reset link is invalid or has expired.');
+  if (!user || user.disabledAt)
+    throw new ValidationError('This reset link is invalid or has expired.');
   validatePassword(newPassword, { username: user.username, email: user.email });
   await db()
     .update(users)
     .set({ passwordHash: await hashPassword(newPassword), passwordChangedAt: now })
     .where(eq(users.id, user.id));
   await revokeAllSessions(user.id, 'password_reset');
-  await audit({ action: 'auth.password_reset', ownerId: user.id, actorUserId: user.id, ip: meta.ip, userAgent: meta.userAgent });
+  await audit({
+    action: 'auth.password_reset',
+    ownerId: user.id,
+    actorUserId: user.id,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
 }
 
 /** Administrative: clear a user's TOTP so they must re-enrol at next sign-in. */
-export async function adminResetTotp(admin: User, targetId: string, meta: SessionMeta): Promise<void> {
+export async function adminResetTotp(
+  admin: User,
+  targetId: string,
+  meta: SessionMeta,
+): Promise<void> {
   if (!admin.isAdmin) throw new ForbiddenError();
   await db()
     .update(users)
-    .set({ totpSecretEnc: null, totpPendingSecretEnc: null, totpEnabledAt: null, totpLastStep: null })
+    .set({
+      totpSecretEnc: null,
+      totpPendingSecretEnc: null,
+      totpEnabledAt: null,
+      totpLastStep: null,
+    })
     .where(eq(users.id, targetId));
   await revokeAllSessions(targetId, 'admin_totp_reset');
   await audit({
@@ -549,10 +648,18 @@ export async function adminResetTotp(admin: User, targetId: string, meta: Sessio
   });
 }
 
-export async function adminSetDisabled(admin: User, targetId: string, disabled: boolean, meta: SessionMeta) {
+export async function adminSetDisabled(
+  admin: User,
+  targetId: string,
+  disabled: boolean,
+  meta: SessionMeta,
+) {
   if (!admin.isAdmin) throw new ForbiddenError();
   if (admin.id === targetId) throw new ValidationError('You cannot disable your own account');
-  await db().update(users).set({ disabledAt: disabled ? new Date() : null }).where(eq(users.id, targetId));
+  await db()
+    .update(users)
+    .set({ disabledAt: disabled ? new Date() : null })
+    .where(eq(users.id, targetId));
   if (disabled) await revokeAllSessions(targetId, 'account_disabled');
   await audit({
     action: 'admin.action',
@@ -566,9 +673,15 @@ export async function adminSetDisabled(admin: User, targetId: string, disabled: 
   });
 }
 
-export async function adminSetAdmin(admin: User, targetId: string, isAdmin: boolean, meta: SessionMeta) {
+export async function adminSetAdmin(
+  admin: User,
+  targetId: string,
+  isAdmin: boolean,
+  meta: SessionMeta,
+) {
   if (!admin.isAdmin) throw new ForbiddenError();
-  if (admin.id === targetId && !isAdmin) throw new ValidationError('You cannot remove your own administrator role');
+  if (admin.id === targetId && !isAdmin)
+    throw new ValidationError('You cannot remove your own administrator role');
   await db().update(users).set({ isAdmin }).where(eq(users.id, targetId));
   await audit({
     action: 'admin.action',

@@ -79,6 +79,8 @@ export function TextField(props: {
             inputMode={props.inputMode}
             required={props.required}
             className={props.className}
+            // Only set by single-purpose screens (sign-in, code entry) where the field is the next thing the person does.
+            // eslint-disable-next-line jsx-a11y/no-autofocus
             autoFocus={props.autoFocus}
             spellCheck={props.spellCheck}
             maxLength={props.maxLength}
@@ -101,7 +103,13 @@ export function SelectField(props: {
   return (
     <Field label={props.label} hint={props.hint} error={props.error} optional={props.optional}>
       {({ id, describedBy, invalid }) => (
-        <select id={id} value={props.value} onChange={(e) => props.onChange(e.target.value)} aria-describedby={describedBy} aria-invalid={invalid || undefined}>
+        <select
+          id={id}
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+          aria-describedby={describedBy}
+          aria-invalid={invalid || undefined}
+        >
           {props.options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -113,11 +121,24 @@ export function SelectField(props: {
   );
 }
 
-export function Checkbox(props: { label: ReactNode; checked: boolean; onChange: (v: boolean) => void; hint?: ReactNode; disabled?: boolean }) {
+export function Checkbox(props: {
+  label: ReactNode;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  hint?: ReactNode;
+  disabled?: boolean;
+}) {
   const id = useId();
   return (
     <div className="choice">
-      <input id={id} type="checkbox" checked={props.checked} disabled={props.disabled} onChange={(e) => props.onChange(e.target.checked)} aria-describedby={props.hint ? `${id}-h` : undefined} />
+      <input
+        id={id}
+        type="checkbox"
+        checked={props.checked}
+        disabled={props.disabled}
+        onChange={(e) => props.onChange(e.target.checked)}
+        aria-describedby={props.hint ? `${id}-h` : undefined}
+      />
       <div>
         <label htmlFor={id}>{props.label}</label>
         {props.hint ? (
@@ -130,11 +151,26 @@ export function Checkbox(props: { label: ReactNode; checked: boolean; onChange: 
   );
 }
 
-export function Radio(props: { name: string; label: ReactNode; value: string; checked: boolean; onChange: (v: string) => void; hint?: ReactNode }) {
+export function Radio(props: {
+  name: string;
+  label: ReactNode;
+  value: string;
+  checked: boolean;
+  onChange: (v: string) => void;
+  hint?: ReactNode;
+}) {
   const id = useId();
   return (
     <div className="choice">
-      <input id={id} type="radio" name={props.name} value={props.value} checked={props.checked} onChange={() => props.onChange(props.value)} aria-describedby={props.hint ? `${id}-h` : undefined} />
+      <input
+        id={id}
+        type="radio"
+        name={props.name}
+        value={props.value}
+        checked={props.checked}
+        onChange={() => props.onChange(props.value)}
+        aria-describedby={props.hint ? `${id}-h` : undefined}
+      />
       <div>
         <label htmlFor={id}>{props.label}</label>
         {props.hint ? (
@@ -158,7 +194,9 @@ export function ErrorSummary({ error }: { error: unknown }) {
   const fields = e ? Object.values(e.fields) : [];
   return (
     <div className="alert alert-error" role="alert" tabIndex={-1} ref={ref}>
-      <span className="alert-title">{e?.message ?? (error as Error).message ?? 'Something went wrong'}</span>
+      <span className="alert-title">
+        {e?.message ?? (error as Error).message ?? 'Something went wrong'}
+      </span>
       {fields.length > 1 ? (
         <ul>
           {fields.map((f) => (
@@ -166,12 +204,22 @@ export function ErrorSummary({ error }: { error: unknown }) {
           ))}
         </ul>
       ) : null}
-      {e?.retryAfterSeconds ? <p>Try again in about {Math.ceil(e.retryAfterSeconds / 60)} minute(s).</p> : null}
+      {e?.retryAfterSeconds ? (
+        <p>Try again in about {Math.ceil(e.retryAfterSeconds / 60)} minute(s).</p>
+      ) : null}
     </div>
   );
 }
 
-export function Alert({ kind = 'info', title, children }: { kind?: 'info' | 'success' | 'warning' | 'error'; title?: string; children?: ReactNode }) {
+export function Alert({
+  kind = 'info',
+  title,
+  children,
+}: {
+  kind?: 'info' | 'success' | 'warning' | 'error';
+  title?: string;
+  children?: ReactNode;
+}) {
   return (
     <div className={`alert alert-${kind}`} role={kind === 'error' ? 'alert' : 'status'}>
       {title ? <span className="alert-title">{title}</span> : null}
@@ -188,7 +236,14 @@ export function fieldError(error: unknown, name: string): string | undefined {
  * Accessible modal dialog built on the native <dialog> element, which provides
  * focus trapping, Escape to close and inert background content.
  */
-export function Dialog(props: { open: boolean; title: string; onClose: () => void; children: ReactNode; actions: ReactNode; describedBy?: string }) {
+export function Dialog(props: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  actions: ReactNode;
+  describedBy?: string;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const opener = useRef<Element | null>(null);
@@ -204,7 +259,16 @@ export function Dialog(props: { open: boolean; title: string; onClose: () => voi
     }
   }, [props.open]);
   return (
-    <dialog ref={ref} aria-labelledby={titleId} aria-describedby={props.describedBy} onClose={props.onClose} onCancel={(e) => { e.preventDefault(); props.onClose(); }}>
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      aria-describedby={props.describedBy}
+      onClose={props.onClose}
+      onCancel={(e) => {
+        e.preventDefault();
+        props.onClose();
+      }}
+    >
       <div className="dialog-body">
         <h2 id={titleId} style={{ marginTop: 0 }}>
           {props.title}
@@ -237,7 +301,8 @@ export function ConfirmDialog(props: {
       setError(null);
     }
   }, [props.open]);
-  const allowed = !props.typeToConfirm || typed.trim().toLowerCase() === props.typeToConfirm.toLowerCase();
+  const allowed =
+    !props.typeToConfirm || typed.trim().toLowerCase() === props.typeToConfirm.toLowerCase();
   return (
     <Dialog
       open={props.open}
@@ -273,7 +338,13 @@ export function ConfirmDialog(props: {
       <div id={descId}>{props.body}</div>
       <ErrorSummary error={error} />
       {props.typeToConfirm ? (
-        <TextField label={`Type "${props.typeToConfirm}" to confirm`} value={typed} onChange={setTyped} autoComplete="off" spellCheck={false} />
+        <TextField
+          label={`Type "${props.typeToConfirm}" to confirm`}
+          value={typed}
+          onChange={setTyped}
+          autoComplete="off"
+          spellCheck={false}
+        />
       ) : null}
     </Dialog>
   );
@@ -287,7 +358,15 @@ export function Loading({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
-export function StatusLine({ ok, warn, children }: { ok?: boolean; warn?: boolean; children: ReactNode }) {
+export function StatusLine({
+  ok,
+  warn,
+  children,
+}: {
+  ok?: boolean;
+  warn?: boolean;
+  children: ReactNode;
+}) {
   const cls = ok ? 'status-ok' : warn ? 'status-warn' : 'status-bad';
   return (
     <span className={`status-line ${cls}`}>

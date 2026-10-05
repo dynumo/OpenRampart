@@ -29,7 +29,10 @@ let cache: { at: number; rows: Row[] } | undefined;
 
 export async function allEventTypes(): Promise<Row[]> {
   if (cache && Date.now() - cache.at < 30_000) return cache.rows;
-  const rows = await db().select().from(eventTypes).orderBy(asc(eventTypes.sortOrder), asc(eventTypes.label));
+  const rows = await db()
+    .select()
+    .from(eventTypes)
+    .orderBy(asc(eventTypes.sortOrder), asc(eventTypes.label));
   cache = { at: Date.now(), rows };
   return rows;
 }
@@ -46,15 +49,24 @@ export async function resolveEventType(idOrKey: string): Promise<Row> {
 }
 
 export async function createEventType(
-  input: { key: string; label: string; description?: string; defaultDirection?: Direction | null; sortOrder?: number },
+  input: {
+    key: string;
+    label: string;
+    description?: string;
+    defaultDirection?: Direction | null;
+    sortOrder?: number;
+  },
   adminId: string,
 ): Promise<Row> {
   const key = input.key.trim().toLowerCase();
   if (!/^[a-z0-9_]{2,64}$/.test(key)) {
-    throw new ValidationError('Invalid key', { key: 'Use 2–64 lower-case letters, numbers or underscores.' });
+    throw new ValidationError('Invalid key', {
+      key: 'Use 2–64 lower-case letters, numbers or underscores.',
+    });
   }
   const label = input.label.trim();
-  if (!label || label.length > 80) throw new ValidationError('Invalid label', { label: 'Enter a label of up to 80 characters.' });
+  if (!label || label.length > 80)
+    throw new ValidationError('Invalid label', { label: 'Enter a label of up to 80 characters.' });
   try {
     const [row] = await db()
       .insert(eventTypes)
@@ -68,23 +80,39 @@ export async function createEventType(
       })
       .returning();
     invalidateEventTypes();
-    await audit({ action: 'admin.action', actorUserId: adminId, targetType: 'event_type', targetId: row!.id, metadata: { operation: 'create_event_type', key } });
+    await audit({
+      action: 'admin.action',
+      actorUserId: adminId,
+      targetType: 'event_type',
+      targetId: row!.id,
+      metadata: { operation: 'create_event_type', key },
+    });
     return row!;
   } catch (err) {
-    if (pgErrorCode(err) === '23505') throw new ConflictError('An Event type with that key already exists');
+    if (pgErrorCode(err) === '23505')
+      throw new ConflictError('An Event type with that key already exists');
     throw err;
   }
 }
 
 export async function updateEventType(
   id: string,
-  input: { label?: string; description?: string; defaultDirection?: Direction | null; sortOrder?: number; archived?: boolean },
+  input: {
+    label?: string;
+    description?: string;
+    defaultDirection?: Direction | null;
+    sortOrder?: number;
+    archived?: boolean;
+  },
   adminId: string,
 ): Promise<Row> {
   const patch: Partial<typeof eventTypes.$inferInsert> = {};
   if (input.label !== undefined) {
     const label = input.label.trim();
-    if (!label || label.length > 80) throw new ValidationError('Invalid label', { label: 'Enter a label of up to 80 characters.' });
+    if (!label || label.length > 80)
+      throw new ValidationError('Invalid label', {
+        label: 'Enter a label of up to 80 characters.',
+      });
     patch.label = label;
   }
   if (input.description !== undefined) patch.description = input.description.trim();
@@ -94,6 +122,12 @@ export async function updateEventType(
   const [row] = await db().update(eventTypes).set(patch).where(eq(eventTypes.id, id)).returning();
   if (!row) throw new NotFoundError('Event type');
   invalidateEventTypes();
-  await audit({ action: 'admin.action', actorUserId: adminId, targetType: 'event_type', targetId: id, metadata: { operation: 'update_event_type' } });
+  await audit({
+    action: 'admin.action',
+    actorUserId: adminId,
+    targetType: 'event_type',
+    targetId: id,
+    metadata: { operation: 'update_event_type' },
+  });
   return row;
 }

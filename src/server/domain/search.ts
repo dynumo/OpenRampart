@@ -35,12 +35,17 @@ const HEADLINE = `StartSel=${HL_START}, StopSel=${HL_END}, MaxFragments=2, MaxWo
 const WORD_RE = /[\p{L}\p{N}][\p{L}\p{N}'’]*/gu;
 
 export function queryWords(q: string): string[] {
-  return (q.match(WORD_RE) ?? []).map((w) => w.toLowerCase().replace(/['’]/g, '')).filter((w) => w.length > 0).slice(0, 12);
+  return (q.match(WORD_RE) ?? [])
+    .map((w) => w.toLowerCase().replace(/['’]/g, ''))
+    .filter((w) => w.length > 0)
+    .slice(0, 12);
 }
 
 /** websearch syntax (quotes, OR, -term) OR every word as a prefix. */
 function tsQuery(q: string, words: string[]): SQL {
-  const prefix = words.length ? words.map((w) => `${w.replace(/[^\p{L}\p{N}]/gu, '')}:*`).join(' & ') : '';
+  const prefix = words.length
+    ? words.map((w) => `${w.replace(/[^\p{L}\p{N}]/gu, '')}:*`).join(' & ')
+    : '';
   return prefix
     ? sql`(websearch_to_tsquery('english', ${q}) || to_tsquery('english', ${prefix}))`
     : sql`websearch_to_tsquery('english', ${q})`;
@@ -153,7 +158,13 @@ export async function search(
     // filterSql() starts with the visibility predicate for alias `e`.
     const candidates = sql`SELECT e.id, e.title, e.description, e.search_vector, e.occurred_at, ${eventDoc(ctx)} AS doc
       FROM events e WHERE ${sql.join(filterSql(ctx, opts.filters ?? {}), sql` AND `)}`;
-    const matched = await rows<{ id: string; rank: number; title_hl: string | null; desc_hl: string | null; matched_in: string[] }>(sql`
+    const matched = await rows<{
+      id: string;
+      rank: number;
+      title_hl: string | null;
+      desc_hl: string | null;
+      matched_in: string[];
+    }>(sql`
       WITH c AS (${candidates}),
       m AS (
         SELECT c.id, c.title, c.description, c.search_vector,
@@ -182,14 +193,23 @@ export async function search(
             t.id AS type_id, t.key AS type_key, t.label AS type_label
           FROM events e JOIN event_types t ON t.id = e.event_type_id
           LEFT JOIN users cu ON cu.id = e.created_by LEFT JOIN users uu ON uu.id = e.updated_by
-          WHERE e.id IN (${sql.join(ids.map((id) => sql`${id}::uuid`), sql`, `)}) AND ${eventVisible(ctx, 'e')}`)
+          WHERE e.id IN (${sql.join(
+            ids.map((id) => sql`${id}::uuid`),
+            sql`, `,
+          )}) AND ${eventVisible(ctx, 'e')}`)
       : [];
     const summaries = await summariesFor(ctx, eventRows);
     const byId = new Map(summaries.map((s) => [s.id, s]));
     result.events = matched
       .filter((m) => byId.has(m.id))
-      .map((m) => ({ ...byId.get(m.id)!, snippet: m.desc_hl ?? m.title_hl ?? null, matchedIn: m.matched_in }));
-    const [count] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM (${candidates}) c WHERE c.doc @@ ${tsq}`);
+      .map((m) => ({
+        ...byId.get(m.id)!,
+        snippet: m.desc_hl ?? m.title_hl ?? null,
+        matchedIn: m.matched_in,
+      }));
+    const [count] = await rows<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM (${candidates}) c WHERE c.doc @@ ${tsq}`,
+    );
     result.totals.events = count?.n ?? 0;
   }
 
@@ -200,7 +220,12 @@ export async function search(
       OR word_similarity(${effective}, a.name) > 0.5
     )`;
     const where = sql`${actorVisible(ctx, 'a')} AND a.merged_into_id IS NULL AND ${actorMatch}`;
-    const list = await rows<{ id: string; name: string; kind: 'organisation' | 'person' | 'other'; snippet: string | null }>(sql`
+    const list = await rows<{
+      id: string;
+      name: string;
+      kind: 'organisation' | 'person' | 'other';
+      snippet: string | null;
+    }>(sql`
       SELECT a.id, a.name, a.kind,
         CASE WHEN ${actorFullAccess(ctx, 'a')} AND to_tsvector('english', a.description) @@ ${tsq}
              THEN ts_headline('english', a.description, ${tsq}, ${HEADLINE}) END AS snippet
@@ -208,19 +233,28 @@ export async function search(
       ORDER BY ts_rank(a.search_vector, ${tsq}) DESC, word_similarity(${effective}, a.name) DESC, a.name
       LIMIT ${limit}`);
     result.actors = list;
-    const [count] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM actors a WHERE ${where}`);
+    const [count] = await rows<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM actors a WHERE ${where}`,
+    );
     result.totals.actors = count?.n ?? 0;
   }
 
   if (include.has('incidents') && hasScope(ctx, 'incidents:read')) {
     const where = sql`${incidentVisible(ctx, 'i')} AND (i.search_vector @@ ${tsq} OR word_similarity(${effective}, i.title) > 0.5)`;
-    const list = await rows<{ id: string; title: string; status: 'open' | 'monitoring' | 'resolved' | 'closed'; snippet: string | null }>(sql`
+    const list = await rows<{
+      id: string;
+      title: string;
+      status: 'open' | 'monitoring' | 'resolved' | 'closed';
+      snippet: string | null;
+    }>(sql`
       SELECT i.id, i.title, i.status,
         CASE WHEN to_tsvector('english', i.description) @@ ${tsq} THEN ts_headline('english', i.description, ${tsq}, ${HEADLINE}) END AS snippet
       FROM incidents i WHERE ${where}
       ORDER BY ts_rank(i.search_vector, ${tsq}) DESC, i.opened_on DESC LIMIT ${limit}`);
     result.incidents = list;
-    const [count] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM incidents i WHERE ${where}`);
+    const [count] = await rows<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM incidents i WHERE ${where}`,
+    );
     result.totals.incidents = count?.n ?? 0;
   }
 
@@ -292,7 +326,9 @@ export async function searchDocuments(
     LEFT JOIN event_types t ON t.id = e.event_type_id
     LEFT JOIN incidents i ON i.id = m.incident_id
     ORDER BY m.rank DESC`);
-  const [count] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM attachments att WHERE ${where}`);
+  const [count] = await rows<{ n: number }>(
+    sql`SELECT count(*)::int AS n FROM attachments att WHERE ${where}`,
+  );
   return {
     items: list.map((r) => ({
       attachmentId: r.attachment_id,
@@ -334,6 +370,10 @@ export async function suggest(ctx: AccessContext, q: string) {
   return {
     actors: actorsList,
     incidents: incidentsList,
-    events: eventsList.map((e) => ({ id: e.id, title: e.title, occurredAt: e.occurred_at.toISOString() })),
+    events: eventsList.map((e) => ({
+      id: e.id,
+      title: e.title,
+      occurredAt: e.occurred_at.toISOString(),
+    })),
   };
 }

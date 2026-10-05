@@ -9,7 +9,13 @@ import { config } from '../config.js';
 import { getPool } from '../db/client.js';
 import { logger } from '../lib/logger.js';
 import { storageHealthy } from '../storage/s3.js';
-import { csrfProtection, errorHandler, loadSession, recordContext, requireUser } from './middleware.js';
+import {
+  csrfProtection,
+  errorHandler,
+  loadSession,
+  recordContext,
+  requireUser,
+} from './middleware.js';
 import { authRouter, invitationRouter } from './routes/auth.js';
 import {
   authorizationServerMetadata,
@@ -42,7 +48,11 @@ export function createApp(opts: AppOptions = {}): Express {
       logger,
       // Never log query strings: they can contain one-time tokens or search text.
       serializers: {
-        req: (req: { method: string; url: string; id: unknown }) => ({ id: req.id, method: req.method, path: String(req.url).split('?')[0] }),
+        req: (req: { method: string; url: string; id: unknown }) => ({
+          id: req.id,
+          method: req.method,
+          path: String(req.url).split('?')[0],
+        }),
         res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
       },
       autoLogging: { ignore: (req) => req.url === '/healthz' || req.url === '/readyz' },
@@ -76,11 +86,16 @@ export function createApp(opts: AppOptions = {}): Express {
       crossOriginEmbedderPolicy: false,
       crossOriginResourcePolicy: { policy: 'same-origin' },
       referrerPolicy: { policy: 'no-referrer' },
-      strictTransportSecurity: c.cookieSecure ? { maxAge: 31_536_000, includeSubDomains: true } : false,
+      strictTransportSecurity: c.cookieSecure
+        ? { maxAge: 31_536_000, includeSubDomains: true }
+        : false,
     }),
   );
   app.use((_req, res, next) => {
-    res.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
+    res.set(
+      'Permissions-Policy',
+      'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()',
+    );
     next();
   });
 
@@ -96,12 +111,20 @@ export function createApp(opts: AppOptions = {}): Express {
         .catch(() => false),
       storageHealthy(),
     ]);
-    res.status(dbOk && s3Ok ? 200 : 503).json({ database: dbOk ? 'ok' : 'unavailable', storage: s3Ok ? 'ok' : 'unavailable' });
+    res
+      .status(dbOk && s3Ok ? 200 : 503)
+      .json({ database: dbOk ? 'ok' : 'unavailable', storage: s3Ok ? 'ok' : 'unavailable' });
   });
 
   // --- OAuth / MCP discovery (before body parsing; the provider parses its own bodies)
-  app.get(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/*rest'], protectedResourceMetadata);
-  app.get(['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration'], authorizationServerMetadata);
+  app.get(
+    ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/*rest'],
+    protectedResourceMetadata,
+  );
+  app.get(
+    ['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration'],
+    authorizationServerMetadata,
+  );
   app.all('/mcp', mcpEndpoint);
 
   app.use(cookieParser());
@@ -142,7 +165,8 @@ export function createApp(opts: AppOptions = {}): Express {
         express.static(root, {
           index: false,
           setHeaders: (res, filePath) => {
-            if (filePath.includes(`${path.sep}assets${path.sep}`)) res.set('Cache-Control', 'public, max-age=31536000, immutable');
+            if (filePath.includes(`${path.sep}assets${path.sep}`))
+              res.set('Cache-Control', 'public, max-age=31536000, immutable');
             else res.set('Cache-Control', 'no-cache');
           },
         }),
@@ -157,13 +181,20 @@ export function createApp(opts: AppOptions = {}): Express {
     }
   }
 
-  app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (err instanceof ZodError) {
-      const fields: Record<string, string> = {};
-      for (const i of err.issues) fields[i.path.join('.') || 'input'] = i.message;
-      return errorHandler(new ValidationError('Please check the details entered', fields), req, res, next);
-    }
-    return errorHandler(err, req, res, next);
-  });
+  app.use(
+    (err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (err instanceof ZodError) {
+        const fields: Record<string, string> = {};
+        for (const i of err.issues) fields[i.path.join('.') || 'input'] = i.message;
+        return errorHandler(
+          new ValidationError('Please check the details entered', fields),
+          req,
+          res,
+          next,
+        );
+      }
+      return errorHandler(err, req, res, next);
+    },
+  );
   return app;
 }

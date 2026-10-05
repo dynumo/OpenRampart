@@ -17,7 +17,9 @@ export async function getSystemSettings(): Promise<SystemSettings> {
   const mode = map.get('registrationMode');
   return {
     registrationMode:
-      mode === 'open' || mode === 'closed' || mode === 'first-user' ? mode : config().REGISTRATION_MODE,
+      mode === 'open' || mode === 'closed' || mode === 'first-user'
+        ? mode
+        : config().REGISTRATION_MODE,
   };
 }
 

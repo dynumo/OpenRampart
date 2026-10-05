@@ -57,9 +57,14 @@ export class RateLimitedError extends AppError {
 /** Raised when an OAuth/MCP token lacks a scope required for an operation. */
 export class InsufficientScopeError extends AppError {
   constructor(public readonly requiredScopes: string[]) {
-    super(`This connection has not been granted: ${requiredScopes.join(', ')}`, 403, 'insufficient_scope', {
-      requiredScopes,
-    });
+    super(
+      `This connection has not been granted: ${requiredScopes.join(', ')}`,
+      403,
+      'insufficient_scope',
+      {
+        requiredScopes,
+      },
+    );
   }
 }
 

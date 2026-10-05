@@ -87,7 +87,11 @@ export async function findSession(token: string) {
 }
 
 /** Update last-seen at most once a minute to avoid a write per request. */
-export async function touchSession(sessionId: string, lastSeenAt: Date, meta: SessionMeta): Promise<void> {
+export async function touchSession(
+  sessionId: string,
+  lastSeenAt: Date,
+  meta: SessionMeta,
+): Promise<void> {
   if (Date.now() - lastSeenAt.getTime() < 60_000) return;
   await db()
     .update(sessions)
@@ -95,7 +99,11 @@ export async function touchSession(sessionId: string, lastSeenAt: Date, meta: Se
     .where(eq(sessions.id, sessionId));
 }
 
-export async function revokeSession(sessionId: string, reason: string, userId?: string): Promise<boolean> {
+export async function revokeSession(
+  sessionId: string,
+  reason: string,
+  userId?: string,
+): Promise<boolean> {
   const rows = await db()
     .update(sessions)
     .set({ revokedAt: new Date(), revokedReason: reason })
@@ -110,7 +118,11 @@ export async function revokeSession(sessionId: string, reason: string, userId?: 
   return rows.length > 0;
 }
 
-export async function revokeAllSessions(userId: string, reason: string, exceptSessionId?: string): Promise<number> {
+export async function revokeAllSessions(
+  userId: string,
+  reason: string,
+  exceptSessionId?: string,
+): Promise<number> {
   const rows = await db()
     .update(sessions)
     .set({ revokedAt: new Date(), revokedReason: reason })

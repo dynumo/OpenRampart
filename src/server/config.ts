@@ -65,7 +65,9 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('production'),
     OPENRAMPART_ROLE: z.enum(['all', 'web', 'worker']).default('all'),
-    LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+    LOG_LEVEL: z
+      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+      .default('info'),
 
     APP_URL: url('APP_URL'),
     HOST: z.string().default('0.0.0.0'),
@@ -81,16 +83,17 @@ const envSchema = z
 
     SESSION_SECRET: z
       .string({ error: 'SESSION_SECRET is required' })
-      .min(32, 'SESSION_SECRET must be at least 32 characters (generate with: openssl rand -base64 48)'),
-    ENCRYPTION_KEY: z
-      .string({ error: 'ENCRYPTION_KEY is required' })
-      .refine((v) => {
-        try {
-          return Buffer.from(v, 'base64').length === 32;
-        } catch {
-          return false;
-        }
-      }, 'ENCRYPTION_KEY must be 32 bytes encoded as base64 (generate with: openssl rand -base64 32)'),
+      .min(
+        32,
+        'SESSION_SECRET must be at least 32 characters (generate with: openssl rand -base64 48)',
+      ),
+    ENCRYPTION_KEY: z.string({ error: 'ENCRYPTION_KEY is required' }).refine((v) => {
+      try {
+        return Buffer.from(v, 'base64').length === 32;
+      } catch {
+        return false;
+      }
+    }, 'ENCRYPTION_KEY must be 32 bytes encoded as base64 (generate with: openssl rand -base64 32)'),
     SESSION_MAX_AGE_HOURS: int(24 * 14, 1, 24 * 365),
     SESSION_IDLE_TIMEOUT_MINUTES: int(60 * 24 * 3, 5, 60 * 24 * 365),
     REQUIRE_TOTP: bool(true),
@@ -100,7 +103,9 @@ const envSchema = z
     S3_ENDPOINT: optionalString,
     S3_REGION: z.string().default('us-east-1'),
     S3_BUCKET: z.string({ error: 'S3_BUCKET is required' }).min(1, 'S3_BUCKET is required'),
-    S3_ACCESS_KEY_ID: z.string({ error: 'S3_ACCESS_KEY_ID is required' }).min(1, 'S3_ACCESS_KEY_ID is required'),
+    S3_ACCESS_KEY_ID: z
+      .string({ error: 'S3_ACCESS_KEY_ID is required' })
+      .min(1, 'S3_ACCESS_KEY_ID is required'),
     S3_SECRET_ACCESS_KEY: z
       .string({ error: 'S3_SECRET_ACCESS_KEY is required' })
       .min(1, 'S3_SECRET_ACCESS_KEY is required'),
@@ -115,7 +120,10 @@ const envSchema = z
     OCR_LANGUAGES: z
       .string()
       .default('eng')
-      .refine((v) => /^[a-z_]+(\+[a-z_]+)*$/i.test(v), 'OCR_LANGUAGES must look like "eng" or "eng+cym"'),
+      .refine(
+        (v) => /^[a-z_]+(\+[a-z_]+)*$/i.test(v),
+        'OCR_LANGUAGES must look like "eng" or "eng+cym"',
+      ),
     OCR_TIMEOUT_SECONDS: int(300, 10, 3600),
     OCR_CONCURRENCY: int(1, 1, 16),
     OCR_MAX_PDF_PAGES: int(200, 1, 5000),
@@ -173,13 +181,22 @@ const envSchema = z
         message: 'MAIL_FROM_ADDRESS is required when a mail provider is configured',
       });
     }
+    if (env.NODE_ENV === 'production' && env.MAIL_PROVIDER === 'log') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MAIL_PROVIDER'],
+        message:
+          'MAIL_PROVIDER=log prints messages (including reset links) to the log and is for development only; use elasticemail, smtp or none',
+      });
+    }
     if (env.NODE_ENV === 'production' && env.APP_URL.startsWith('http://')) {
       const host = new URL(env.APP_URL).hostname;
       if (host !== 'localhost' && host !== '127.0.0.1') {
         ctx.addIssue({
           code: 'custom',
           path: ['APP_URL'],
-          message: 'APP_URL must use https:// in production (OAuth and secure cookies depend on it)',
+          message:
+            'APP_URL must use https:// in production (OAuth and secure cookies depend on it)',
         });
       }
     }
@@ -228,9 +245,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
   const oauthIssuer = (env.OAUTH_ISSUER ?? env.APP_URL).replace(/\/+$/, '');
   const mcpResourceUrl = (env.MCP_RESOURCE_URL ?? `${env.APP_URL}/mcp`).replace(/\/+$/, '');
   const cookieSecure =
-    env.COOKIE_SECURE !== undefined
-      ? env.COOKIE_SECURE === 'true'
-      : appUrl.protocol === 'https:';
+    env.COOKIE_SECURE !== undefined ? env.COOKIE_SECURE === 'true' : appUrl.protocol === 'https:';
   return {
     ...env,
     appUrl,

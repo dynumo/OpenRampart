@@ -12,7 +12,9 @@ export const E2E_ENV: Record<string, string> = {
   NODE_ENV: 'production',
   APP_URL: E2E_BASE,
   PORT: String(PORT),
-  DATABASE_URL: process.env.E2E_DATABASE_URL ?? 'postgres://openrampart:openrampart@localhost:5432/openrampart_e2e',
+  DATABASE_URL:
+    process.env.E2E_DATABASE_URL ??
+    'postgres://openrampart:openrampart@localhost:5432/openrampart_e2e',
   SESSION_SECRET: 'e2e-session-secret-0123456789abcdefghijklmnopqrstuvwxyz',
   ENCRYPTION_KEY: Buffer.alloc(32, 9).toString('base64'),
   S3_ENDPOINT: process.env.E2E_S3_ENDPOINT ?? 'http://localhost:8333',
@@ -21,7 +23,7 @@ export const E2E_ENV: Record<string, string> = {
   S3_SECRET_ACCESS_KEY: process.env.E2E_S3_SECRET_ACCESS_KEY ?? 'openrampart-dev-secret',
   S3_FORCE_PATH_STYLE: 'true',
   S3_CREATE_BUCKET: 'true',
-  MAIL_PROVIDER: 'log',
+  MAIL_PROVIDER: 'none',
   MAIL_FROM_ADDRESS: 'e2e@openrampart.invalid',
   REGISTRATION_MODE: 'open',
   OPENRAMPART_DISABLE_RATE_LIMITS: 'true',
@@ -46,7 +48,13 @@ export default defineConfig({
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], ...(executablePath ? { launchOptions: { executablePath } } : {}) } },
+    {
+      name: 'desktop',
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(executablePath ? { launchOptions: { executablePath } } : {}),
+      },
+    },
   ],
   webServer: {
     command: 'node scripts/e2e-reset-db.mjs && node dist/server/index.js',

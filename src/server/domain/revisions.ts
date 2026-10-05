@@ -46,7 +46,13 @@ export interface EventSnapshot {
   reference: string | null;
   dueOn: string | null;
   actors: { id: string; name: string; role: string | null }[];
-  attachments: { id: string; filename: string; mimeType: string; sizeBytes: number; sha256: string }[];
+  attachments: {
+    id: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+  }[];
 }
 
 export async function buildSnapshot(

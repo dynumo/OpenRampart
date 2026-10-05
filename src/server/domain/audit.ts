@@ -99,7 +99,10 @@ export async function audit(entry: AuditInput, executor: Executor = db()): Promi
     });
   } catch (err) {
     // Audit failure must be visible to operators but must not leak content.
-    logger.error({ err: (err as Error).message, action: entry.action }, 'failed to write audit entry');
+    logger.error(
+      { err: (err as Error).message, action: entry.action },
+      'failed to write audit entry',
+    );
     if (executor !== db()) throw err;
   }
 }
@@ -122,7 +125,10 @@ export function auditCtx(
       oauthClientId: ctx.oauth?.clientId ?? null,
       ip: ctx.ip ?? null,
       userAgent: ctx.userAgent ?? null,
-      metadata: { ...(ctx.role === 'helper' ? { asHelper: true } : {}), ...(target.metadata ?? {}) },
+      metadata: {
+        ...(ctx.role === 'helper' ? { asHelper: true } : {}),
+        ...(target.metadata ?? {}),
+      },
     },
     executor,
   );
@@ -145,7 +151,8 @@ export async function listAuditEntries(userId: string, q: AuditQuery = {}) {
     or(eq(auditEntries.ownerId, userId), eq(auditEntries.actorUserId, userId))!,
   ];
   if (q.before) conditions.push(lt(auditEntries.id, q.before));
-  if (q.action) conditions.push(sql`${auditEntries.action} LIKE ${q.action.replace(/[%_]/g, '') + '%'}`);
+  if (q.action)
+    conditions.push(sql`${auditEntries.action} LIKE ${q.action.replace(/[%_]/g, '') + '%'}`);
   const limit = Math.min(Math.max(q.limit ?? 50, 1), 200);
   const rows = await db()
     .select()

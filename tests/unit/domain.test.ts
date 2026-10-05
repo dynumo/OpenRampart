@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { formatOccurrence, localDateString, parseOccurrence, zonedToUtc } from '../../src/shared/dates.js';
+import {
+  formatOccurrence,
+  localDateString,
+  parseOccurrence,
+  zonedToUtc,
+} from '../../src/shared/dates.js';
 import { expandScopes } from '../../src/shared/scopes.js';
 import { canonicalHash, canonicalJson } from '../../src/server/integrity/canonical.js';
-import { buildSuggestions, extractAmounts, extractDates, extractReferences } from '../../src/server/ocr/suggestions.js';
+import {
+  buildSuggestions,
+  extractAmounts,
+  extractDates,
+  extractReferences,
+} from '../../src/server/ocr/suggestions.js';
 import { loadConfig, ConfigError } from '../../src/server/config.js';
 import { sanitiseFilename, isInlineSafe } from '../../src/server/storage/fileTypes.js';
 import { validatePassword } from '../../src/server/auth/passwords.js';
@@ -10,11 +20,22 @@ import { normaliseRecoveryCode } from '../../src/server/auth/recoveryCodes.js';
 
 describe('date handling', () => {
   it('interprets date-only and local times in the record owner’s time zone, across DST', () => {
-    expect(parseOccurrence('2026-07-01', 'Europe/London')).toEqual({ instant: new Date('2026-06-30T23:00:00Z'), precision: 'date' });
-    expect(parseOccurrence('2026-01-01', 'Europe/London')!.instant.toISOString()).toBe('2026-01-01T00:00:00.000Z');
-    expect(parseOccurrence('2026-03-29T01:30', 'Europe/London')!.instant.toISOString()).toBe('2026-03-29T01:30:00.000Z');
-    expect(parseOccurrence('2026-07-01T09:00', 'America/New_York')!.instant.toISOString()).toBe('2026-07-01T13:00:00.000Z');
-    expect(parseOccurrence('2026-07-01T09:00:00+01:00', 'Asia/Tokyo')!.instant.toISOString()).toBe('2026-07-01T08:00:00.000Z');
+    expect(parseOccurrence('2026-07-01', 'Europe/London')).toEqual({
+      instant: new Date('2026-06-30T23:00:00Z'),
+      precision: 'date',
+    });
+    expect(parseOccurrence('2026-01-01', 'Europe/London')!.instant.toISOString()).toBe(
+      '2026-01-01T00:00:00.000Z',
+    );
+    expect(parseOccurrence('2026-03-29T01:30', 'Europe/London')!.instant.toISOString()).toBe(
+      '2026-03-29T01:30:00.000Z',
+    );
+    expect(parseOccurrence('2026-07-01T09:00', 'America/New_York')!.instant.toISOString()).toBe(
+      '2026-07-01T13:00:00.000Z',
+    );
+    expect(parseOccurrence('2026-07-01T09:00:00+01:00', 'Asia/Tokyo')!.instant.toISOString()).toBe(
+      '2026-07-01T08:00:00.000Z',
+    );
     expect(parseOccurrence('2026-02-30', 'Europe/London')).toBeNull();
     expect(parseOccurrence('yesterday', 'Europe/London')).toBeNull();
   });
@@ -53,7 +74,9 @@ You owe £1,100.00. A previous payment of £250 was received on 12/09/2026.`;
   });
 
   it('matches known Actors by name or alias and proposes a title', () => {
-    const s = buildSuggestions(letter, [{ id: 'a1', name: 'HMRC', aliases: ['HM Revenue & Customs'] }]);
+    const s = buildSuggestions(letter, [
+      { id: 'a1', name: 'HMRC', aliases: ['HM Revenue & Customs'] },
+    ]);
     expect(s.actors[0]).toMatchObject({ actorId: 'a1', name: 'HMRC' });
     expect(s.title).toBe('Self Assessment penalty');
   });
@@ -77,7 +100,12 @@ describe('configuration validation', () => {
   });
   it('lists every missing or invalid setting at once', () => {
     try {
-      loadConfig({ ...base, DATABASE_URL: '', SESSION_SECRET: 'short', MAIL_PROVIDER: 'elasticemail' });
+      loadConfig({
+        ...base,
+        DATABASE_URL: '',
+        SESSION_SECRET: 'short',
+        MAIL_PROVIDER: 'elasticemail',
+      });
       expect.unreachable();
     } catch (err) {
       expect(err).toBeInstanceOf(ConfigError);
@@ -89,8 +117,12 @@ describe('configuration validation', () => {
     }
   });
   it('refuses plain http in production except for localhost', () => {
-    expect(() => loadConfig({ ...base, NODE_ENV: 'production', APP_URL: 'http://record.example.org' })).toThrow(/https/);
-    expect(() => loadConfig({ ...base, NODE_ENV: 'production', APP_URL: 'http://localhost:3000' })).not.toThrow();
+    expect(() =>
+      loadConfig({ ...base, NODE_ENV: 'production', APP_URL: 'http://record.example.org' }),
+    ).toThrow(/https/);
+    expect(() =>
+      loadConfig({ ...base, NODE_ENV: 'production', APP_URL: 'http://localhost:3000' }),
+    ).not.toThrow();
   });
 });
 
@@ -119,6 +151,9 @@ describe('file and credential safety', () => {
     expect(normaliseRecoveryCode(' abcde-fghjk ')).toBe('ABCDEFGHJK');
   });
   it('expands scope hierarchies', () => {
-    expect([...expandScopes(['attachments:read', 'bogus'])].sort()).toEqual(['attachments:metadata', 'attachments:read']);
+    expect([...expandScopes(['attachments:read', 'bogus'])].sort()).toEqual([
+      'attachments:metadata',
+      'attachments:read',
+    ]);
   });
 });

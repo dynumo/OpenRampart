@@ -2,7 +2,9 @@
 export const TEST_ENV: Record<string, string> = {
   NODE_ENV: 'test',
   APP_URL: 'http://localhost:3999',
-  DATABASE_URL: process.env.TEST_DATABASE_URL ?? 'postgres://openrampart:openrampart@localhost:5432/openrampart_test',
+  DATABASE_URL:
+    process.env.TEST_DATABASE_URL ??
+    'postgres://openrampart:openrampart@localhost:5432/openrampart_test',
   SESSION_SECRET: 'test-session-secret-0123456789abcdefghijklmnopqrstuvwxyz',
   ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
   S3_ENDPOINT: process.env.TEST_S3_ENDPOINT ?? 'http://localhost:8333',

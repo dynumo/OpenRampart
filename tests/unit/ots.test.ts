@@ -13,7 +13,11 @@ import {
 } from '../../src/server/integrity/ots.js';
 
 const fixture = (name: string) => readFileSync(path.join(__dirname, '../fixtures/ots', name));
-const block = JSON.parse(fixture('block-358391.json').toString()) as { height: number; merkle_root: string; timestamp: number };
+const block = JSON.parse(fixture('block-358391.json').toString()) as {
+  height: number;
+  merkle_root: string;
+  timestamp: number;
+};
 const lookup: BlockLookup = async (height) => {
   if (height !== block.height) throw new Error('unknown block');
   return { height, merkleRootHex: block.merkle_root, time: block.timestamp };
@@ -58,7 +62,9 @@ describe('OpenTimestamps proof format', () => {
   });
 
   it('builds a Merkle batch where every leaf reaches the same root', () => {
-    const digests = Array.from({ length: 5 }, (_, i) => createHash('sha256').update(`doc ${i}`).digest());
+    const digests = Array.from({ length: 5 }, (_, i) =>
+      createHash('sha256').update(`doc ${i}`).digest(),
+    );
     const { leaves, root } = buildMerkleBatch(digests);
     root.addAttestation({ kind: 'pending', uri: 'https://calendar.example' });
     for (const leaf of leaves) {

@@ -14,7 +14,9 @@ import { ValidationError } from '../lib/errors.js';
  * SHA-256 and enforcing the size limit as bytes arrive. The browser-declared
  * content type is ignored; the type is later verified from the bytes.
  */
-export async function receiveUpload(req: Request): Promise<UploadedFile & { fields: Record<string, string> }> {
+export async function receiveUpload(
+  req: Request,
+): Promise<UploadedFile & { fields: Record<string, string> }> {
   const limit = config().maxUploadBytes;
   if (!req.is('multipart/form-data')) throw new ValidationError('Expected a file upload');
   await mkdir(UPLOAD_TMP_DIR, { recursive: true, mode: 0o700 });
@@ -29,7 +31,10 @@ export async function receiveUpload(req: Request): Promise<UploadedFile & { fiel
     };
     let bb: busboy.Busboy;
     try {
-      bb = busboy({ headers: req.headers, limits: { files: 1, fileSize: limit, fields: 20, fieldSize: 10_000 } });
+      bb = busboy({
+        headers: req.headers,
+        limits: { files: 1, fileSize: limit, fields: 20, fieldSize: 10_000 },
+      });
     } catch {
       return fail(new ValidationError('Malformed upload'));
     }
@@ -48,7 +53,9 @@ export async function receiveUpload(req: Request): Promise<UploadedFile & { fiel
           size += chunk.length;
           hash.update(chunk);
         });
-        stream.on('limit', () => rej(new ValidationError(`Files must be no larger than ${config().MAX_UPLOAD_MB} MB`)));
+        stream.on('limit', () =>
+          rej(new ValidationError(`Files must be no larger than ${config().MAX_UPLOAD_MB} MB`)),
+        );
         out.on('finish', () => {
           fileInfo = { filename: info.filename || 'upload', size, sha256: hash.digest('hex') };
           res();
@@ -70,7 +77,13 @@ export async function receiveUpload(req: Request): Promise<UploadedFile & { fiel
             void rm(tmpPath, { force: true });
             return reject(new ValidationError('The file is empty'));
           }
-          resolve({ tmpPath, originalFilename: f.filename, sizeBytes: f.size, sha256: f.sha256, fields });
+          resolve({
+            tmpPath,
+            originalFilename: f.filename,
+            sizeBytes: f.size,
+            sha256: f.sha256,
+            fields,
+          });
         })
         .catch((err: Error) => fail(err));
     });

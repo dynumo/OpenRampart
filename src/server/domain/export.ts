@@ -6,9 +6,22 @@ import { ForbiddenError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { sanitiseFilename } from '../storage/fileTypes.js';
 import { getObjectStream } from '../storage/s3.js';
-import { actorFullAccess, actorVisible, attachmentVisible, eventVisible, incidentVisible, restrictContext } from './access.js';
+import {
+  actorFullAccess,
+  actorVisible,
+  attachmentVisible,
+  eventVisible,
+  incidentVisible,
+  restrictContext,
+} from './access.js';
 import { auditCtx } from './audit.js';
-import { canExportAnything, hasScope, isOwner, requireScopes, type AccessContext } from './context.js';
+import {
+  canExportAnything,
+  hasScope,
+  isOwner,
+  requireScopes,
+  type AccessContext,
+} from './context.js';
 import { summariesFor, type EventRow } from './events.js';
 import { rows } from './sqlutil.js';
 
@@ -26,7 +39,8 @@ function zipPath(...parts: string[]): string {
 
 export async function assertCanExport(ctx: AccessContext): Promise<AccessContext> {
   requireScopes(ctx, 'export:read');
-  if (!canExportAnything(ctx)) throw new ForbiddenError('Your access to this record does not include exporting');
+  if (!canExportAnything(ctx))
+    throw new ForbiddenError('Your access to this record does not include exporting');
   return restrictContext(ctx, 'export');
 }
 
@@ -52,11 +66,22 @@ export interface ExportData {
     ocrEngine: string | null;
     path: string;
   }[];
-  timestamps: { subjectType: string; subjectId: string; digest: string; status: string; proof: Buffer | null; attestedTime: string | null; attestedHeight: number | null }[];
+  timestamps: {
+    subjectType: string;
+    subjectId: string;
+    digest: string;
+    status: string;
+    proof: Buffer | null;
+    attestedTime: string | null;
+    attestedHeight: number | null;
+  }[];
 }
 
 /** Gather everything visible to an export-capable context. */
-export async function collectExport(ctx: AccessContext, opts: { includeContents?: boolean } = {}): Promise<ExportData> {
+export async function collectExport(
+  ctx: AccessContext,
+  opts: { includeContents?: boolean } = {},
+): Promise<ExportData> {
   const ex = await assertCanExport(ctx);
   const includeContents = opts.includeContents ?? hasScope(ctx, 'attachments:read');
   const eventRows = await rows<EventRow>(sql`
@@ -91,7 +116,9 @@ export async function collectExport(ctx: AccessContext, opts: { includeContents?
       currency: s.currency,
       reference: s.reference,
       dueOn: s.dueOn,
-      actors: s.actors.map((a) => (a.redacted ? { redacted: true } : { id: a.id, name: a.name, role: a.role })),
+      actors: s.actors.map((a) =>
+        a.redacted ? { redacted: true } : { id: a.id, name: a.name, role: a.role },
+      ),
       incidentIds: s.incidents.map((i) => i.id),
       revision: r.revision,
       createdAt: r.created_at.toISOString(),
@@ -164,7 +191,11 @@ export async function collectExport(ctx: AccessContext, opts: { includeContents?
     : [];
   const attachments = atts.map((a) => {
     const folder = a.event_id
-      ? zipPath('attachments', 'events', `${a.occurred_at?.toISOString().slice(0, 10) ?? 'undated'}_${a.event_id}`)
+      ? zipPath(
+          'attachments',
+          'events',
+          `${a.occurred_at?.toISOString().slice(0, 10) ?? 'undated'}_${a.event_id}`,
+        )
       : zipPath('attachments', 'incidents', a.incident_id!);
     return {
       id: a.id,
@@ -200,7 +231,9 @@ export async function collectExport(ctx: AccessContext, opts: { includeContents?
         SELECT 1 FROM event_revisions r JOIN events e ON e.id = r.event_id WHERE r.id = tp.subject_id AND ${eventVisible(ex, 'e')}))
     )`);
 
-  const [owner] = await rows<{ display_name: string }>(sql`SELECT display_name FROM users WHERE id = ${ex.ownerId}::uuid`);
+  const [owner] = await rows<{ display_name: string }>(
+    sql`SELECT display_name FROM users WHERE id = ${ex.ownerId}::uuid`,
+  );
   return {
     manifest: {
       schema: EXPORT_SCHEMA,
@@ -222,7 +255,9 @@ export async function collectExport(ctx: AccessContext, opts: { includeContents?
       attachmentContentsIncluded: includeContents,
       notes: isOwner(ex)
         ? []
-        : ['This export contains only the parts of the record shared with you. Actors outside your access are shown as "redacted".'],
+        : [
+            'This export contains only the parts of the record shared with you. Actors outside your access are shown as "redacted".',
+          ],
     },
     events,
     actors,
@@ -243,7 +278,14 @@ export async function collectExport(ctx: AccessContext, opts: { includeContents?
 }
 
 function readme(data: ExportData): string {
-  const m = data.manifest as { exportedAt: string; recordOwner: string; scope: string; counts: Record<string, number>; timezone: string; notes: string[] };
+  const m = data.manifest as {
+    exportedAt: string;
+    recordOwner: string;
+    scope: string;
+    counts: Record<string, number>;
+    timezone: string;
+    notes: string[];
+  };
   return `# OpenRampart export
 
 Exported: ${m.exportedAt}
@@ -290,10 +332,24 @@ Format reference: https://github.com/dynumo/OpenRampart/blob/main/docs/export-fo
 
 function timeline(data: ExportData, timezone: string): string {
   const lines = ['# Timeline', ''];
-  for (const e of data.events as { occurredAt: string; occurredPrecision: 'date' | 'datetime'; displayTitle: string; typeLabel: string; actors: { name?: string; redacted?: boolean }[]; description: string; riskLevel: string; id: string }[]) {
+  for (const e of data.events as {
+    occurredAt: string;
+    occurredPrecision: 'date' | 'datetime';
+    displayTitle: string;
+    typeLabel: string;
+    actors: { name?: string; redacted?: boolean }[];
+    description: string;
+    riskLevel: string;
+    id: string;
+  }[]) {
     const when = formatOccurrence(e.occurredAt, e.occurredPrecision, timezone);
     const who = e.actors.map((a) => (a.redacted ? '(redacted)' : a.name)).join(', ');
-    lines.push(`## ${when} — ${e.displayTitle}`, '', `*${e.typeLabel}*${who ? ` · ${who}` : ''}${e.riskLevel !== 'none' ? ` · Risk: ${e.riskLevel}` : ''}`, '');
+    lines.push(
+      `## ${when} — ${e.displayTitle}`,
+      '',
+      `*${e.typeLabel}*${who ? ` · ${who}` : ''}${e.riskLevel !== 'none' ? ` · Risk: ${e.riskLevel}` : ''}`,
+      '',
+    );
     if (e.description) lines.push(e.description, '');
     lines.push(`<small>Event ${e.id}</small>`, '');
   }
@@ -301,7 +357,9 @@ function timeline(data: ExportData, timezone: string): string {
 }
 
 /** Stream the export as a ZIP archive. */
-export async function exportZip(ctx: AccessContext): Promise<{ stream: Readable; filename: string }> {
+export async function exportZip(
+  ctx: AccessContext,
+): Promise<{ stream: Readable; filename: string }> {
   const data = await collectExport(ctx);
   const zip = new yazl.ZipFile();
   const json = (v: unknown) => Buffer.from(JSON.stringify(v, null, 2) + '\n', 'utf8');
@@ -315,7 +373,11 @@ export async function exportZip(ctx: AccessContext): Promise<{ stream: Readable;
   zip.addBuffer(json(data.attachments.map(({ storageKey: _k, ...a }) => a)), 'attachments.json');
   zip.addBuffer(Buffer.from(timeline(data, ctx.ownerTimezone)), 'timeline.md');
   for (const t of data.timestamps) {
-    if (t.proof) zip.addBuffer(Buffer.from(t.proof), zipPath('timestamps', `${t.subjectType}_${t.subjectId}.ots`));
+    if (t.proof)
+      zip.addBuffer(
+        Buffer.from(t.proof),
+        zipPath('timestamps', `${t.subjectType}_${t.subjectId}.ots`),
+      );
   }
   const includeFiles = hasScope(ctx, 'attachments:read');
   for (const a of data.attachments) {

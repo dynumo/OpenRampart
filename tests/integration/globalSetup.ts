@@ -6,9 +6,14 @@ export default async function setup() {
   Object.assign(process.env, TEST_ENV);
   const url = new URL(TEST_ENV.DATABASE_URL!);
   const dbName = url.pathname.slice(1);
-  const admin = new pg.Client({ connectionString: Object.assign(new URL(url), { pathname: '/postgres' }).toString() });
+  const admin = new pg.Client({
+    connectionString: Object.assign(new URL(url), { pathname: '/postgres' }).toString(),
+  });
   await admin.connect();
-  await admin.query(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()`, [dbName]);
+  await admin.query(
+    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()`,
+    [dbName],
+  );
   await admin.query(`DROP DATABASE IF EXISTS "${dbName}"`);
   await admin.query(`CREATE DATABASE "${dbName}"`);
   await admin.end();

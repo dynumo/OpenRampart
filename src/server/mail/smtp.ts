@@ -19,12 +19,14 @@ export class SmtpProvider implements MailProvider {
     private readonly opts: SmtpOptions,
     transporter?: Transporter,
   ) {
-    this.transporter = transporter ?? nodemailer.createTransport({
-      host: opts.host,
-      port: opts.port,
-      secure: opts.secure,
-      auth: opts.user ? { user: opts.user, pass: opts.password ?? '' } : undefined,
-    });
+    this.transporter =
+      transporter ??
+      nodemailer.createTransport({
+        host: opts.host,
+        port: opts.port,
+        secure: opts.secure,
+        auth: opts.user ? { user: opts.user, pass: opts.password ?? '' } : undefined,
+      });
   }
 
   async send(message: MailMessage): Promise<{ id?: string }> {

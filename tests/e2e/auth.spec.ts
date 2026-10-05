@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { expectAccessible, fillAccountForm, freshCode, register, signIn, signOut, uniq } from './helpers';
+import {
+  expectAccessible,
+  fillAccountForm,
+  freshCode,
+  register,
+  signIn,
+  signOut,
+  uniq,
+} from './helpers';
 
 test.describe('Accounts, TOTP, recovery codes and sessions', () => {
   test('account creation with TOTP setup is accessible', async ({ page }) => {
@@ -51,7 +59,9 @@ test.describe('Accounts, TOTP, recovery codes and sessions', () => {
     await expect(page.getByRole('heading', { name: 'Timeline' })).toBeVisible();
     await page.goto('/settings/security/audit');
     await expect(page.getByRole('cell', { name: 'Recovery code used' }).first()).toBeVisible();
-    await expect(page.getByRole('cell', { name: /Wrong authentication code/ }).first()).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: /Wrong authentication code/ }).first(),
+    ).toBeVisible();
     await expectAccessible(page, 'audit log');
   });
 
@@ -63,7 +73,10 @@ test.describe('Accounts, TOTP, recovery codes and sessions', () => {
     await expect(otherPage.getByRole('heading', { name: 'Timeline' })).toBeVisible();
     await page.goto('/settings/security');
     await expect(page.getByText('This device')).toBeVisible();
-    await page.getByRole('button', { name: /^Sign out Chrome|^Sign out .* on / }).first().click();
+    await page
+      .getByRole('button', { name: /^Sign out Chrome|^Sign out .* on / })
+      .first()
+      .click();
     await expect(page.getByRole('status').filter({ hasText: 'Device signed out' })).toBeVisible();
     await otherPage.goto('/');
     await expect(otherPage.getByRole('heading', { name: 'Sign in' })).toBeVisible();

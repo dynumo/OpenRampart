@@ -35,7 +35,11 @@ import { derivedKey, getObjectStream, putBuffer } from '../storage/s3.js';
  */
 
 export async function processAttachment(attachmentId: string): Promise<void> {
-  const [att] = await db().select().from(attachments).where(eq(attachments.id, attachmentId)).limit(1);
+  const [att] = await db()
+    .select()
+    .from(attachments)
+    .where(eq(attachments.id, attachmentId))
+    .limit(1);
   if (!att || att.deletedAt) return;
   const category = categoryOf(att.mimeType);
   const workDir = await mkdtemp(path.join(os.tmpdir(), 'openrampart-proc-'));
@@ -51,14 +55,20 @@ export async function processAttachment(attachmentId: string): Promise<void> {
       .set({ integrityCheckedAt: new Date(), integrityOk })
       .where(eq(attachments.id, att.id));
     if (!integrityOk) {
-      logger.error({ attachmentId }, 'stored original does not match recorded SHA-256; processing stopped');
+      logger.error(
+        { attachmentId },
+        'stored original does not match recorded SHA-256; processing stopped',
+      );
       await db()
         .update(attachments)
         .set({
           derivativeStatus: att.derivativeStatus === 'not_applicable' ? 'not_applicable' : 'failed',
           derivativeError: 'The stored file does not match its recorded hash.',
           ocrStatus: att.ocrStatus === 'pending' ? 'failed' : att.ocrStatus,
-          ocrError: att.ocrStatus === 'pending' ? 'The stored file does not match its recorded hash.' : att.ocrError,
+          ocrError:
+            att.ocrStatus === 'pending'
+              ? 'The stored file does not match its recorded hash.'
+              : att.ocrError,
         })
         .where(eq(attachments.id, att.id));
       return;
@@ -75,17 +85,31 @@ export async function processAttachment(attachmentId: string): Promise<void> {
         rasterPath = await renderPdfFirstPage(originalPath, path.join(workDir, 'page1'));
       }
     } catch (err) {
-      logger.warn({ attachmentId, err: (err as Error).message.slice(0, 200) }, 'could not rasterise attachment');
+      logger.warn(
+        { attachmentId, err: (err as Error).message.slice(0, 200) },
+        'could not rasterise attachment',
+      );
     }
 
     if (att.derivativeStatus === 'pending') {
-      await db().update(attachments).set({ derivativeStatus: 'processing' }).where(eq(attachments.id, att.id));
+      await db()
+        .update(attachments)
+        .set({ derivativeStatus: 'processing' })
+        .where(eq(attachments.id, att.id));
       try {
         if (!rasterPath) throw new Error('No renderable image');
         const base = sharp(rasterPath, { failOn: 'none', limitInputPixels: 268_402_689 }).rotate();
         const meta = await base.metadata();
-        const thumb = await base.clone().resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true }).webp({ quality: 72 }).toBuffer();
-        const preview = await base.clone().resize({ width: 1800, height: 2400, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+        const thumb = await base
+          .clone()
+          .resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 72 })
+          .toBuffer();
+        const preview = await base
+          .clone()
+          .resize({ width: 1800, height: 2400, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 82 })
+          .toBuffer();
         const thumbKey = derivedKey(att.ownerId, att.id, 'thumbnail.webp');
         const previewKey = derivedKey(att.ownerId, att.id, 'preview.webp');
         await putBuffer(thumbKey, thumb, 'image/webp');
@@ -104,18 +128,32 @@ export async function processAttachment(attachmentId: string): Promise<void> {
           })
           .where(eq(attachments.id, att.id));
       } catch (err) {
-        logger.warn({ attachmentId, err: (err as Error).message.slice(0, 200) }, 'preview generation failed');
+        logger.warn(
+          { attachmentId, err: (err as Error).message.slice(0, 200) },
+          'preview generation failed',
+        );
         await db()
           .update(attachments)
-          .set({ derivativeStatus: 'failed', derivativeError: 'A preview could not be generated for this file.', pageCount })
+          .set({
+            derivativeStatus: 'failed',
+            derivativeError: 'A preview could not be generated for this file.',
+            pageCount,
+          })
           .where(eq(attachments.id, att.id));
       }
     }
 
     if (att.ocrStatus === 'pending') {
-      await db().update(attachments).set({ ocrStatus: 'processing' }).where(eq(attachments.id, att.id));
+      await db()
+        .update(attachments)
+        .set({ ocrStatus: 'processing' })
+        .where(eq(attachments.id, att.id));
       const c = config();
-      const opts = { languages: c.OCR_LANGUAGES, timeoutSeconds: c.OCR_TIMEOUT_SECONDS, maxPdfPages: c.OCR_MAX_PDF_PAGES };
+      const opts = {
+        languages: c.OCR_LANGUAGES,
+        timeoutSeconds: c.OCR_TIMEOUT_SECONDS,
+        maxPdfPages: c.OCR_MAX_PDF_PAGES,
+      };
       try {
         let text = '';
         let engine = '';
@@ -142,11 +180,21 @@ export async function processAttachment(attachmentId: string): Promise<void> {
         } else {
           throw new Error('Unsupported for OCR');
         }
-        text = text.replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{4,}/g, '\n\n\n').trim();
+        text = text
+          .replace(/\r\n/g, '\n')
+          .replace(/[ \t]+\n/g, '\n')
+          .replace(/\n{4,}/g, '\n\n\n')
+          .trim();
         const known = await db()
           .select({ id: actors.id, name: actors.name, aliases: actors.aliases })
           .from(actors)
-          .where(and(eq(actors.ownerId, att.ownerId), isNull(actors.deletedAt), isNull(actors.mergedIntoId)));
+          .where(
+            and(
+              eq(actors.ownerId, att.ownerId),
+              isNull(actors.deletedAt),
+              isNull(actors.mergedIntoId),
+            ),
+          );
         await db()
           .update(attachments)
           .set({
@@ -159,7 +207,10 @@ export async function processAttachment(attachmentId: string): Promise<void> {
           })
           .where(eq(attachments.id, att.id));
       } catch (err) {
-        logger.warn({ attachmentId, err: (err as Error).message.slice(0, 200) }, 'text recognition failed');
+        logger.warn(
+          { attachmentId, err: (err as Error).message.slice(0, 200) },
+          'text recognition failed',
+        );
         await db()
           .update(attachments)
           .set({

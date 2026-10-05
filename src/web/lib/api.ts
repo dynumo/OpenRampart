@@ -65,7 +65,14 @@ function headers(method: string, json: boolean): Record<string, string> {
 }
 
 async function parseError(res: Response): Promise<ApiError> {
-  let body: { error?: { code?: string; message?: string; fields?: Record<string, string>; retryAfterSeconds?: number } } = {};
+  let body: {
+    error?: {
+      code?: string;
+      message?: string;
+      fields?: Record<string, string>;
+      retryAfterSeconds?: number;
+    };
+  } = {};
   try {
     body = await res.json();
   } catch {
@@ -74,11 +81,18 @@ async function parseError(res: Response): Promise<ApiError> {
   const e = body.error ?? {};
   const message =
     e.message ??
-    (res.status === 413 ? 'That file is too large.' : res.status >= 500 ? 'Something went wrong. Please try again.' : 'The request could not be completed.');
+    (res.status === 413
+      ? 'That file is too large.'
+      : res.status >= 500
+        ? 'Something went wrong. Please try again.'
+        : 'The request could not be completed.');
   return new ApiError(message, res.status, e.code ?? 'error', e.fields ?? {}, e.retryAfterSeconds);
 }
 
-export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown; query?: Query; base?: string } = {}): Promise<T> {
+export async function api<T = unknown>(
+  path: string,
+  opts: { method?: string; body?: unknown; query?: Query; base?: string } = {},
+): Promise<T> {
   const method = opts.method ?? 'GET';
   const res = await fetch(`${opts.base ?? '/api'}${path}${qs(opts.query)}`, {
     method,
@@ -92,7 +106,11 @@ export async function api<T = unknown>(path: string, opts: { method?: string; bo
 }
 
 /** Upload one file with progress reporting (XMLHttpRequest exposes upload progress). */
-export function uploadFile<T>(path: string, file: File, onProgress?: (fraction: number) => void): Promise<T> {
+export function uploadFile<T>(
+  path: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `/api${path}`);
@@ -108,17 +126,34 @@ export function uploadFile<T>(path: string, file: File, onProgress?: (fraction: 
         // ignore
       }
       if (xhr.status >= 200 && xhr.status < 300) return resolve(body as T);
-      const e = (body as { error?: { message?: string; code?: string; fields?: Record<string, string> } } | null)?.error ?? {};
-      reject(new ApiError(e.message ?? (xhr.status === 413 ? 'That file is too large.' : 'Upload failed'), xhr.status, e.code ?? 'error', e.fields ?? {}));
+      const e =
+        (
+          body as {
+            error?: { message?: string; code?: string; fields?: Record<string, string> };
+          } | null
+        )?.error ?? {};
+      reject(
+        new ApiError(
+          e.message ?? (xhr.status === 413 ? 'That file is too large.' : 'Upload failed'),
+          xhr.status,
+          e.code ?? 'error',
+          e.fields ?? {},
+        ),
+      );
     };
-    xhr.onerror = () => reject(new ApiError('The connection was interrupted. Please try again.', 0, 'network'));
+    xhr.onerror = () =>
+      reject(new ApiError('The connection was interrupted. Please try again.', 0, 'network'));
     const form = new FormData();
     form.append('file', file, file.name);
     xhr.send(form);
   });
 }
 
-export function attachmentUrl(id: string, variant: 'original' | 'thumbnail' | 'preview', download = false): string {
+export function attachmentUrl(
+  id: string,
+  variant: 'original' | 'thumbnail' | 'preview',
+  download = false,
+): string {
   // Images and documents are fetched by the browser directly (no custom headers), so a
   // Helper's selected record travels in the query string. The server authorises every request.
   return `/api/attachments/${id}/${variant}${qs({ download: download ? '1' : undefined, record: recordOwner ?? undefined })}`;

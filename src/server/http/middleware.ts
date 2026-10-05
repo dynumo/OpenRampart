@@ -25,7 +25,11 @@ export function sessionCookieName(): string {
   return config().cookieSecure ? '__Host-or_session' : 'or_session';
 }
 
-export function setSessionCookie(res: Response, token: string, stage: 'mfa' | 'totp_setup' | 'active'): void {
+export function setSessionCookie(
+  res: Response,
+  token: string,
+  stage: 'mfa' | 'totp_setup' | 'active',
+): void {
   const c = config();
   res.cookie(sessionCookieName(), token, {
     httpOnly: true,
@@ -37,7 +41,12 @@ export function setSessionCookie(res: Response, token: string, stage: 'mfa' | 't
 }
 
 export function clearSessionCookie(res: Response): void {
-  res.clearCookie(sessionCookieName(), { httpOnly: true, secure: config().cookieSecure, sameSite: 'lax', path: '/' });
+  res.clearCookie(sessionCookieName(), {
+    httpOnly: true,
+    secure: config().cookieSecure,
+    sameSite: 'lax',
+    path: '/',
+  });
 }
 
 export function requestMeta(req: Request) {
@@ -104,10 +113,16 @@ export async function recordContext(req: Request, res: Response, next: NextFunct
   if (!user) return next(new UnauthenticatedError());
   // Images and documents are loaded by the browser without custom headers, so
   // GET requests may name the record in the query string instead.
-  const fromQuery = req.method === 'GET' && typeof req.query.record === 'string' ? req.query.record : null;
+  const fromQuery =
+    req.method === 'GET' && typeof req.query.record === 'string' ? req.query.record : null;
   const requested = req.get('x-openrampart-record') || fromQuery || null;
   try {
-    locals(res).ctx = await resolveContext({ userId: user.id, ownerId: requested, via: 'web', ...requestMeta(req) });
+    locals(res).ctx = await resolveContext({
+      userId: user.id,
+      ownerId: requested,
+      via: 'web',
+      ...requestMeta(req),
+    });
     next();
   } catch (err) {
     next(err);
@@ -127,12 +142,16 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   }
   if (err instanceof AppError) {
     if (err instanceof RateLimitedError) res.set('Retry-After', String(err.retryAfterSeconds));
-    res.status(err.status).json({ error: { code: err.code, message: err.message, ...(err.details ?? {}) } });
+    res
+      .status(err.status)
+      .json({ error: { code: err.code, message: err.message, ...(err.details ?? {}) } });
     return;
   }
   const e = err as { type?: string; status?: number; message?: string };
   if (e?.type === 'entity.parse.failed') {
-    res.status(400).json({ error: { code: 'bad_request', message: 'The request body is not valid JSON' } });
+    res
+      .status(400)
+      .json({ error: { code: 'bad_request', message: 'The request body is not valid JSON' } });
     return;
   }
   if (e?.type === 'entity.too.large') {
@@ -140,5 +159,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
   logger.error({ err: e?.message, path: req.path, method: req.method }, 'unhandled error');
-  res.status(500).json({ error: { code: 'server_error', message: 'Something went wrong. Please try again.' } });
+  res
+    .status(500)
+    .json({ error: { code: 'server_error', message: 'Something went wrong. Please try again.' } });
 }

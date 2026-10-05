@@ -38,18 +38,38 @@ export function settingsRouter(): Router {
 
   r.post('/helpers', async (req, res) => {
     const input = z
-      .object({ label: z.string().max(120), email: z.string().max(320).nullish(), sendEmail: z.boolean().optional(), grant: z.record(z.string(), z.unknown()) })
+      .object({
+        label: z.string().max(120),
+        email: z.string().max(320).nullish(),
+        sendEmail: z.boolean().optional(),
+        grant: z.record(z.string(), z.unknown()),
+      })
       .parse(req.body);
-    res.status(201).json(await helpers.inviteHelper(await ownerCtx(res, req), input as Parameters<typeof helpers.inviteHelper>[1]));
+    res
+      .status(201)
+      .json(
+        await helpers.inviteHelper(
+          await ownerCtx(res, req),
+          input as Parameters<typeof helpers.inviteHelper>[1],
+        ),
+      );
   });
 
   r.post('/helpers/:id/reinvite', async (req, res) => {
     const input = z.object({ sendEmail: z.boolean().optional() }).parse(req.body ?? {});
-    res.json(await helpers.reissueInvitation(await ownerCtx(res, req), String(req.params.id), input.sendEmail ?? true));
+    res.json(
+      await helpers.reissueInvitation(
+        await ownerCtx(res, req),
+        String(req.params.id),
+        input.sendEmail ?? true,
+      ),
+    );
   });
 
   r.post('/helpers/:id/grants', async (req, res) => {
-    res.status(201).json(await helpers.addGrant(await ownerCtx(res, req), String(req.params.id), req.body));
+    res
+      .status(201)
+      .json(await helpers.addGrant(await ownerCtx(res, req), String(req.params.id), req.body));
   });
 
   r.put('/grants/:id', async (req, res) => {
@@ -80,13 +100,21 @@ export function settingsRouter(): Router {
   r.get('/audit', async (req, res) => {
     const before = Number(req.query.before) || undefined;
     const action = typeof req.query.action === 'string' ? req.query.action : undefined;
-    res.json(await listAuditEntries(locals(res).user!.id, { before, action, limit: Number(req.query.limit) || 50 }));
+    res.json(
+      await listAuditEntries(locals(res).user!.id, {
+        before,
+        action,
+        limit: Number(req.query.limit) || 50,
+      }),
+    );
   });
 
   /** Turn an Audit Log entry into a normal Event — only ever on request. */
   r.post('/audit/:id/event', async (req, res) => {
     const user = locals(res).user!;
-    const input = z.object({ typeId: z.string().optional(), title: z.string().max(300).optional() }).parse(req.body ?? {});
+    const input = z
+      .object({ typeId: z.string().optional(), title: z.string().max(300).optional() })
+      .parse(req.body ?? {});
     const [entry] = await db()
       .select()
       .from(auditEntries)
@@ -162,7 +190,9 @@ export function settingsRouter(): Router {
 
   admin.get('/system', async (_req, res) => {
     const c = config();
-    const [counts] = await rows<Record<string, number>>(sql`SELECT (SELECT count(*)::int FROM users) AS users, (SELECT count(*)::int FROM events) AS events, (SELECT count(*)::int FROM attachments) AS attachments`);
+    const [counts] = await rows<Record<string, number>>(
+      sql`SELECT (SELECT count(*)::int FROM users) AS users, (SELECT count(*)::int FROM events) AS events, (SELECT count(*)::int FROM attachments) AS attachments`,
+    );
     res.json({
       settings: await getSystemSettings(),
       environment: {
@@ -190,9 +220,16 @@ export function settingsRouter(): Router {
   });
 
   admin.patch('/settings', async (req, res) => {
-    const input = z.object({ registrationMode: z.enum(['first-user', 'open', 'closed']) }).parse(req.body);
+    const input = z
+      .object({ registrationMode: z.enum(['first-user', 'open', 'closed']) })
+      .parse(req.body);
     await setSystemSetting('registrationMode', input.registrationMode, locals(res).user!.id);
-    await audit({ action: 'admin.action', actorUserId: locals(res).user!.id, ...requestMeta(req), metadata: { operation: 'registration_mode', value: input.registrationMode } });
+    await audit({
+      action: 'admin.action',
+      actorUserId: locals(res).user!.id,
+      ...requestMeta(req),
+      metadata: { operation: 'registration_mode', value: input.registrationMode },
+    });
     res.json(await getSystemSettings());
   });
 
@@ -235,14 +272,20 @@ export function settingsRouter(): Router {
 
   admin.post('/test-email', async (req, res) => {
     const input = z.object({ to: z.string().email() }).parse(req.body);
-    if (!mailConfigured()) throw new ValidationError('No mail provider is configured (MAIL_PROVIDER)');
+    if (!mailConfigured())
+      throw new ValidationError('No mail provider is configured (MAIL_PROVIDER)');
     await sendMail({
       to: input.to,
       subject: 'OpenRampart test email',
       text: 'This is a test message from your OpenRampart server. Email delivery is working.',
       html: '<p>This is a test message from your OpenRampart server. Email delivery is working.</p>',
     });
-    await audit({ action: 'admin.action', actorUserId: locals(res).user!.id, ...requestMeta(req), metadata: { operation: 'test_email' } });
+    await audit({
+      action: 'admin.action',
+      actorUserId: locals(res).user!.id,
+      ...requestMeta(req),
+      metadata: { operation: 'test_email' },
+    });
     res.json({ ok: true });
   });
 

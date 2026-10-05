@@ -31,21 +31,43 @@ export interface RecordInfo {
   timezone: string;
   role: 'owner' | 'helper';
   capabilities: { add: boolean; export: boolean; organise: boolean };
-  grants: { scopeType: string; dateFrom: string | null; dateTo: string | null; canAdd: boolean; canExport: boolean }[];
+  grants: {
+    scopeType: string;
+    dateFrom: string | null;
+    dateTo: string | null;
+    canAdd: boolean;
+    canExport: boolean;
+  }[];
   counts: { events: number; incidents: number; open_incidents: number };
 }
 
-const AuthContext = createContext<{ state: AuthState | undefined; refresh: () => Promise<unknown> }>({ state: undefined, refresh: async () => undefined });
+const AuthContext = createContext<{
+  state: AuthState | undefined;
+  refresh: () => Promise<unknown>;
+}>({ state: undefined, refresh: async () => undefined });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const q = useQuery({ queryKey: ['auth'], queryFn: () => api<AuthState>('/auth/state'), staleTime: 60_000 });
+  const q = useQuery({
+    queryKey: ['auth'],
+    queryFn: () => api<AuthState>('/auth/state'),
+    staleTime: 60_000,
+  });
   useEffect(() => {
     setCsrfToken(q.data?.csrfToken);
     // Drop a stale record selection the user no longer has access to.
     const selected = getRecordOwner();
-    if (q.data?.stage === 'active' && selected && !q.data.sharedRecords?.some((r) => r.ownerId === selected)) setRecordOwner(null);
+    if (
+      q.data?.stage === 'active' &&
+      selected &&
+      !q.data.sharedRecords?.some((r) => r.ownerId === selected)
+    )
+      setRecordOwner(null);
   }, [q.data]);
-  return <AuthContext.Provider value={{ state: q.data, refresh: () => q.refetch() }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ state: q.data, refresh: () => q.refetch() }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

@@ -2,6 +2,7 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { config } from '../config.js';
 import * as schema from './schema.js';
+import { logger } from '../lib/logger.js';
 
 export type Database = NodePgDatabase<typeof schema>;
 /** Either the root database handle or a transaction handle. */
@@ -34,7 +35,7 @@ export function getPool(): pg.Pool {
     pool = createPool(c.DATABASE_URL, c.DATABASE_SSL, c.DATABASE_POOL_MAX);
     pool.on('error', (err) => {
       // Idle client errors (e.g. database restart) must not crash the process.
-      console.error('PostgreSQL pool error:', err.message);
+      logger.error({ err: err.message }, 'PostgreSQL pool error');
     });
   }
   return pool;

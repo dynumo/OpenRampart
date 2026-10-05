@@ -90,12 +90,17 @@ export async function putBuffer(key: string, body: Buffer, contentType: string):
   await upload.done();
 }
 
-export async function getObjectStream(key: string, range?: string): Promise<{
+export async function getObjectStream(
+  key: string,
+  range?: string,
+): Promise<{
   body: Readable;
   contentLength?: number;
   contentRange?: string;
 }> {
-  const res = await s3().send(new GetObjectCommand({ Bucket: bucket(), Key: prefixed(key), Range: range }));
+  const res = await s3().send(
+    new GetObjectCommand({ Bucket: bucket(), Key: prefixed(key), Range: range }),
+  );
   return {
     body: res.Body as Readable,
     contentLength: res.ContentLength,
@@ -128,7 +133,11 @@ export async function deletePrefix(prefix: string): Promise<number> {
   let token: string | undefined;
   do {
     const res = await s3().send(
-      new ListObjectsV2Command({ Bucket: bucket(), Prefix: prefixed(prefix), ContinuationToken: token }),
+      new ListObjectsV2Command({
+        Bucket: bucket(),
+        Prefix: prefixed(prefix),
+        ContinuationToken: token,
+      }),
     );
     for (const obj of res.Contents ?? []) {
       if (obj.Key) {

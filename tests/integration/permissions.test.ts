@@ -3,32 +3,68 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { getActor, listActors, mergeActors, suggestActors } from '../../src/server/domain/actors.js';
-import { getAttachment, getAttachmentText, storeAttachment } from '../../src/server/domain/attachments.js';
+import {
+  getActor,
+  listActors,
+  mergeActors,
+  suggestActors,
+} from '../../src/server/domain/actors.js';
+import {
+  getAttachment,
+  getAttachmentText,
+  storeAttachment,
+} from '../../src/server/domain/attachments.js';
 import type { AccessContext } from '../../src/server/domain/context.js';
-import { createEvent, getEvent, linkEvents, listEvents, updateEvent, deleteEvent } from '../../src/server/domain/events.js';
+import {
+  createEvent,
+  getEvent,
+  linkEvents,
+  listEvents,
+  updateEvent,
+  deleteEvent,
+} from '../../src/server/domain/events.js';
 import { collectExport } from '../../src/server/domain/export.js';
 import { endHelper, revokeGrant } from '../../src/server/domain/helpers.js';
-import { addEventsToIncident, getIncident, listIncidents } from '../../src/server/domain/incidents.js';
+import {
+  addEventsToIncident,
+  getIncident,
+  listIncidents,
+} from '../../src/server/domain/incidents.js';
 import { search, searchDocuments, suggest } from '../../src/server/domain/search.js';
 import { resolveContext } from '../../src/server/domain/access.js';
 import { db } from '../../src/server/db/client.js';
 import { attachments } from '../../src/server/db/schema.js';
 import { eq } from 'drizzle-orm';
-import { actor, event, grantHelper, helperCtx, incident, makeUser, oauthCtx, ownerCtx } from './helpers.js';
+import {
+  actor,
+  event,
+  grantHelper,
+  helperCtx,
+  incident,
+  makeUser,
+  oauthCtx,
+  ownerCtx,
+} from './helpers.js';
 
 async function textAttachment(ctx: AccessContext, eventId: string, filename: string, text: string) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'or-test-'));
   const file = path.join(dir, 'f');
   await writeFile(file, text);
-  const a = await storeAttachment(ctx, { eventId }, {
-    tmpPath: file,
-    originalFilename: filename,
-    sizeBytes: Buffer.byteLength(text),
-    sha256: createHash('sha256').update(text).digest('hex'),
-  });
+  const a = await storeAttachment(
+    ctx,
+    { eventId },
+    {
+      tmpPath: file,
+      originalFilename: filename,
+      sizeBytes: Buffer.byteLength(text),
+      sha256: createHash('sha256').update(text).digest('hex'),
+    },
+  );
   // Simulate OCR having completed (the OCR pipeline has its own tests).
-  await db().update(attachments).set({ ocrText: text, ocrStatus: 'done' }).where(eq(attachments.id, a.id));
+  await db()
+    .update(attachments)
+    .set({ ocrText: text, ocrStatus: 'done' })
+    .where(eq(attachments.id, a.id));
   return a;
 }
 
@@ -47,26 +83,65 @@ describe('Helper permissions and leakage prevention', () => {
     B = (await actor(owner, 'Barclays')).id;
     D = (await createActorWithDetails(owner)).id;
     H = (await actor(owner, 'HMRC')).id;
-    e1 = (await event(owner, { title: 'Old Barclays statement', occurredAt: '2025-06-01', actors: [{ actorId: B }] })).id;
-    e2 = (await event(owner, { title: 'Collector letter about Barclays debt', occurredAt: '2026-02-10', description: 'Mentions zebrafinch reference', actors: [{ actorId: B }, { actorId: D, role: 'sender' }] })).id;
-    e3 = (await event(owner, { title: 'Phone call', occurredAt: '2026-03-05', actors: [{ actorId: D }] })).id;
-    e4 = (await event(owner, { title: 'Tax letter', occurredAt: '2026-04-01', actors: [{ actorId: H }] })).id;
+    e1 = (
+      await event(owner, {
+        title: 'Old Barclays statement',
+        occurredAt: '2025-06-01',
+        actors: [{ actorId: B }],
+      })
+    ).id;
+    e2 = (
+      await event(owner, {
+        title: 'Collector letter about Barclays debt',
+        occurredAt: '2026-02-10',
+        description: 'Mentions zebrafinch reference',
+        actors: [{ actorId: B }, { actorId: D, role: 'sender' }],
+      })
+    ).id;
+    e3 = (
+      await event(owner, {
+        title: 'Phone call',
+        occurredAt: '2026-03-05',
+        actors: [{ actorId: D }],
+      })
+    ).id;
+    e4 = (
+      await event(owner, {
+        title: 'Tax letter',
+        occurredAt: '2026-04-01',
+        actors: [{ actorId: H }],
+      })
+    ).id;
     I1 = (await incident(owner, 'Arrears problem', [e2, e3])).id;
     I2 = (await incident(owner, 'Tax matter', [e4])).id;
     await linkEvents(owner, e2, e3);
     await linkEvents(owner, e2, e1);
-    attOnE3 = (await textAttachment(owner, e3, 'debtco-ledger.txt', 'The DebtCo ledger shows quokkaword balance')).id;
+    attOnE3 = (
+      await textAttachment(
+        owner,
+        e3,
+        'debtco-ledger.txt',
+        'The DebtCo ledger shows quokkaword balance',
+      )
+    ).id;
   });
 
   async function createActorWithDetails(ctx: AccessContext) {
     const { createActor } = await import('../../src/server/domain/actors.js');
-    return createActor(ctx, { name: 'DebtCo Collections', description: 'Private note about DebtCo', accountReference: 'DC-999', aliases: ['DCC'] });
+    return createActor(ctx, {
+      name: 'DebtCo Collections',
+      description: 'Private note about DebtCo',
+      accountReference: 'DC-999',
+      aliases: ['DCC'],
+    });
   }
 
   describe('Actor scope with a start date, view only, co-Actors redacted (default)', () => {
     let ctx: AccessContext;
     beforeAll(async () => {
-      ctx = (await grantHelper(owner, { scopeType: 'actors', actorIds: [B], dateFrom: '2026-01-01' })).ctx;
+      ctx = (
+        await grantHelper(owner, { scopeType: 'actors', actorIds: [B], dateFrom: '2026-01-01' })
+      ).ctx;
     });
 
     it('lists only in-scope Events', async () => {
@@ -76,7 +151,8 @@ describe('Helper permissions and leakage prevention', () => {
     });
 
     it('refuses direct access to out-of-scope Events as not found', async () => {
-      for (const id of [e1, e3, e4]) await expect(getEvent(ctx, id)).rejects.toMatchObject({ status: 404 });
+      for (const id of [e1, e3, e4])
+        await expect(getEvent(ctx, id)).rejects.toMatchObject({ status: 404 });
     });
 
     it('redacts co-Actors on a shared Event without revealing their identity', async () => {
@@ -146,8 +222,12 @@ describe('Helper permissions and leakage prevention', () => {
     });
 
     it('cannot add, edit, delete or export', async () => {
-      await expect(createEvent(ctx, { typeId: 'note', occurredAt: '2026-05-01', actors: [{ actorId: B }] })).rejects.toMatchObject({ status: 403 });
-      await expect(updateEvent(ctx, e2, { title: 'changed' })).rejects.toMatchObject({ status: 403 });
+      await expect(
+        createEvent(ctx, { typeId: 'note', occurredAt: '2026-05-01', actors: [{ actorId: B }] }),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(updateEvent(ctx, e2, { title: 'changed' })).rejects.toMatchObject({
+        status: 403,
+      });
       await expect(deleteEvent(ctx, e2)).rejects.toMatchObject({ status: 403 });
       await expect(collectExport(ctx)).rejects.toMatchObject({ status: 403 });
     });
@@ -157,14 +237,22 @@ describe('Helper permissions and leakage prevention', () => {
     let ctx: AccessContext;
     let helperId: string;
     beforeAll(async () => {
-      const g = await grantHelper(owner, { scopeType: 'actors', actorIds: [B], dateFrom: '2026-01-01', canAdd: true, canExport: true, coActorVisibility: 'name' });
+      const g = await grantHelper(owner, {
+        scopeType: 'actors',
+        actorIds: [B],
+        dateFrom: '2026-01-01',
+        canAdd: true,
+        canExport: true,
+        coActorVisibility: 'name',
+      });
       ctx = g.ctx;
       helperId = g.helper.id;
     });
 
     it('shows the co-Actor name but not its details or wider history', async () => {
       const e = await getEvent(ctx, e2);
-      const d = e.actors.find((a) => !a.redacted && a.id === D) as { fullAccess: boolean } | undefined;
+      const d = e.actors.find((a) => !a.redacted && a.id === D) as
+        { fullAccess: boolean } | undefined;
       expect(d).toBeTruthy();
       expect(d!.fullAccess).toBe(false);
       const dActor = await getActor(ctx, D);
@@ -172,13 +260,20 @@ describe('Helper permissions and leakage prevention', () => {
       expect(dActor.aliases).toEqual([]);
       expect(dActor.accountReference).toBeNull();
       expect(dActor.stats.eventCount).toBe(1); // e2 only, never e3
-      expect((await listEvents(ctx, { actorIds: [D] }, { withTotal: true })).items.map((x) => x.id)).toEqual([e2]);
+      expect(
+        (await listEvents(ctx, { actorIds: [D] }, { withTotal: true })).items.map((x) => x.id),
+      ).toEqual([e2]);
       // Alias of a name-only Actor must not be searchable.
       expect((await search(ctx, 'DCC', { correct: false })).totals.actors).toBe(0);
     });
 
     it('can add Events inside its scope, attributed to the Helper', async () => {
-      const created = await createEvent(ctx, { typeId: 'phone_call', title: 'Helper call', occurredAt: '2026-05-01', actors: [{ actorId: B }] });
+      const created = await createEvent(ctx, {
+        typeId: 'phone_call',
+        title: 'Helper call',
+        occurredAt: '2026-05-01',
+        actors: [{ actorId: B }],
+      });
       expect(created.createdBy?.id).toBe(helperId);
       expect(created.permissions.canEdit).toBe(true);
       const updated = await updateEvent(ctx, created.id, { title: 'Helper call (corrected)' });
@@ -186,15 +281,33 @@ describe('Helper permissions and leakage prevention', () => {
     });
 
     it('cannot add Events outside its dates or Actors', async () => {
-      await expect(createEvent(ctx, { typeId: 'note', occurredAt: '2025-01-01', actors: [{ actorId: B }] })).rejects.toMatchObject({ status: 403 });
-      await expect(createEvent(ctx, { typeId: 'note', occurredAt: '2026-05-01', newActors: [{ name: 'Someone new' }] })).rejects.toMatchObject({ status: 403 });
+      await expect(
+        createEvent(ctx, { typeId: 'note', occurredAt: '2025-01-01', actors: [{ actorId: B }] }),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        createEvent(ctx, {
+          typeId: 'note',
+          occurredAt: '2026-05-01',
+          newActors: [{ name: 'Someone new' }],
+        }),
+      ).rejects.toMatchObject({ status: 403 });
       // A name-only Actor cannot be linked.
-      await expect(createEvent(ctx, { typeId: 'note', occurredAt: '2026-05-01', actors: [{ actorId: B }, { actorId: D }] })).rejects.toMatchObject({ status: 400 });
-      await expect(createEvent(ctx, { typeId: 'note', occurredAt: '2026-05-01', actors: [{ actorId: H }] })).rejects.toMatchObject({ status: 400 });
+      await expect(
+        createEvent(ctx, {
+          typeId: 'note',
+          occurredAt: '2026-05-01',
+          actors: [{ actorId: B }, { actorId: D }],
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+      await expect(
+        createEvent(ctx, { typeId: 'note', occurredAt: '2026-05-01', actors: [{ actorId: H }] }),
+      ).rejects.toMatchObject({ status: 400 });
     });
 
     it("cannot edit or delete the owner's Events", async () => {
-      await expect(updateEvent(ctx, e2, { description: 'tampered' })).rejects.toMatchObject({ status: 403 });
+      await expect(updateEvent(ctx, e2, { description: 'tampered' })).rejects.toMatchObject({
+        status: 403,
+      });
       await expect(deleteEvent(ctx, e2)).rejects.toMatchObject({ status: 403 });
     });
 
@@ -245,7 +358,9 @@ describe('Helper permissions and leakage prevention', () => {
   describe('All records within a date range', () => {
     let ctx: AccessContext;
     beforeAll(async () => {
-      ctx = (await grantHelper(owner, { scopeType: 'all', dateFrom: '2026-03-01', dateTo: '2026-03-31' })).ctx;
+      ctx = (
+        await grantHelper(owner, { scopeType: 'all', dateFrom: '2026-03-01', dateTo: '2026-03-31' })
+      ).ctx;
     });
 
     it('limits Events, Incident timelines and Actor statistics to the range', async () => {
@@ -262,8 +377,18 @@ describe('Helper permissions and leakage prevention', () => {
   describe('Actor merges preserve Helper access exactly', () => {
     it('neither widens nor narrows access unless explicitly extended', async () => {
       const B2 = (await actor(owner, 'Barclays Bank UK')).id;
-      const e5 = (await event(owner, { title: 'Duplicate-actor event', occurredAt: '2026-06-01', actors: [{ actorId: B2 }] })).id;
-      const { ctx } = await grantHelper(owner, { scopeType: 'actors', actorIds: [B], dateFrom: '2026-01-01' });
+      const e5 = (
+        await event(owner, {
+          title: 'Duplicate-actor event',
+          occurredAt: '2026-06-01',
+          actors: [{ actorId: B2 }],
+        })
+      ).id;
+      const { ctx } = await grantHelper(owner, {
+        scopeType: 'actors',
+        actorIds: [B],
+        dateFrom: '2026-01-01',
+      });
       const before = (await listEvents(ctx, {})).items.map((e) => e.id).sort();
       await mergeActors(owner, B, [B2]);
       const after = (await listEvents(ctx, {})).items.map((e) => e.id).sort();
@@ -277,10 +402,24 @@ describe('Helper permissions and leakage prevention', () => {
 
     it('extends access when the owner chooses to', async () => {
       const B3 = (await actor(owner, 'Barclaycard')).id;
-      const e6 = (await event(owner, { title: 'Barclaycard event', occurredAt: '2026-06-02', actors: [{ actorId: B3 }] })).id;
-      const { ctx } = await grantHelper(owner, { scopeType: 'actors', actorIds: [B], dateFrom: '2026-01-01' });
+      const e6 = (
+        await event(owner, {
+          title: 'Barclaycard event',
+          occurredAt: '2026-06-02',
+          actors: [{ actorId: B3 }],
+        })
+      ).id;
+      const { ctx } = await grantHelper(owner, {
+        scopeType: 'actors',
+        actorIds: [B],
+        dateFrom: '2026-01-01',
+      });
       await mergeActors(owner, B, [B3], { extendHelperAccess: true });
-      const refreshed = await resolveContext({ userId: ctx.userId, ownerId: ctx.ownerId, via: 'web' });
+      const refreshed = await resolveContext({
+        userId: ctx.userId,
+        ownerId: ctx.ownerId,
+        via: 'web',
+      });
       expect((await listEvents(refreshed, {})).items.map((e) => e.id)).toContain(e6);
     });
   });
@@ -293,7 +432,9 @@ describe('Helper permissions and leakage prevention', () => {
       await expect(helperCtx(helper.id, owner.ownerId)).rejects.toMatchObject({ status: 404 });
       const second = await grantHelper(owner, { scopeType: 'all' });
       await endHelper(owner, second.ctx.grants[0]!.relationshipId);
-      await expect(helperCtx(second.helper.id, owner.ownerId)).rejects.toMatchObject({ status: 404 });
+      await expect(helperCtx(second.helper.id, owner.ownerId)).rejects.toMatchObject({
+        status: 404,
+      });
     });
 
     it('a stranger cannot open someone else’s record', async () => {
@@ -304,11 +445,24 @@ describe('Helper permissions and leakage prevention', () => {
 
   describe('Helpers adding to Incidents', () => {
     it('an Incident Helper with Add can only add Events inside the Incident', async () => {
-      const { ctx } = await grantHelper(owner, { scopeType: 'incidents', incidentIds: [I1], canAdd: true });
-      const created = await createEvent(ctx, { typeId: 'note', occurredAt: '2026-03-10', title: 'Added by incident helper', incidentIds: [I1] });
+      const { ctx } = await grantHelper(owner, {
+        scopeType: 'incidents',
+        incidentIds: [I1],
+        canAdd: true,
+      });
+      const created = await createEvent(ctx, {
+        typeId: 'note',
+        occurredAt: '2026-03-10',
+        title: 'Added by incident helper',
+        incidentIds: [I1],
+      });
       expect(created.incidents.map((i) => i.id)).toEqual([I1]);
-      await expect(createEvent(ctx, { typeId: 'note', occurredAt: '2026-03-10', title: 'Loose' })).rejects.toMatchObject({ status: 403 });
-      await expect(createEvent(ctx, { typeId: 'note', occurredAt: '2026-03-10', incidentIds: [I2] })).rejects.toMatchObject({ status: 400 });
+      await expect(
+        createEvent(ctx, { typeId: 'note', occurredAt: '2026-03-10', title: 'Loose' }),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        createEvent(ctx, { typeId: 'note', occurredAt: '2026-03-10', incidentIds: [I2] }),
+      ).rejects.toMatchObject({ status: 400 });
       await expect(addEventsToIncident(ctx, I1, [e4])).rejects.toMatchObject({ status: 404 });
     });
   });
@@ -321,8 +475,12 @@ describe('Helper permissions and leakage prevention', () => {
       const r = await search(ctx, 'quokkaword');
       expect(r.totals.events).toBe(0);
       expect(r.totals.documents).toBe(0);
-      await expect(getAttachment(ctx, attOnE3)).rejects.toMatchObject({ code: 'insufficient_scope' });
-      await expect(getAttachmentText(ctx, attOnE3)).rejects.toMatchObject({ code: 'insufficient_scope' });
+      await expect(getAttachment(ctx, attOnE3)).rejects.toMatchObject({
+        code: 'insufficient_scope',
+      });
+      await expect(getAttachmentText(ctx, attOnE3)).rejects.toMatchObject({
+        code: 'insufficient_scope',
+      });
     });
 
     it('attachments:metadata reveals names and hashes but not contents', async () => {
@@ -333,7 +491,9 @@ describe('Helper permissions and leakage prevention', () => {
       const byName = await searchDocuments(ctx, 'ledger');
       expect(byName.total).toBe(1);
       expect(byName.items[0]!.snippet).toBeNull();
-      await expect(getAttachmentText(ctx, attOnE3)).rejects.toMatchObject({ code: 'insufficient_scope' });
+      await expect(getAttachmentText(ctx, attOnE3)).rejects.toMatchObject({
+        code: 'insufficient_scope',
+      });
     });
 
     it('attachments:read allows contents', async () => {
@@ -345,7 +505,9 @@ describe('Helper permissions and leakage prevention', () => {
 
     it('read scopes cannot write and nothing is searchable without search:read', async () => {
       const ctx = oauthCtx(owner, ['events:read']);
-      await expect(createEvent(ctx, { typeId: 'note', occurredAt: '2026-01-01' })).rejects.toMatchObject({ code: 'insufficient_scope' });
+      await expect(
+        createEvent(ctx, { typeId: 'note', occurredAt: '2026-01-01' }),
+      ).rejects.toMatchObject({ code: 'insufficient_scope' });
       await expect(search(ctx, 'Barclays')).rejects.toMatchObject({ code: 'insufficient_scope' });
       await expect(collectExport(ctx)).rejects.toMatchObject({ code: 'insufficient_scope' });
     });

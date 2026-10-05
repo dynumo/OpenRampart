@@ -34,7 +34,11 @@ export interface TotpCheck {
  * Verify a code, allowing one period of clock drift either side and refusing
  * any time step at or before `lastStep` (replay protection).
  */
-export async function checkTotp(secret: string, token: string, lastStep?: number | null): Promise<TotpCheck> {
+export async function checkTotp(
+  secret: string,
+  token: string,
+  lastStep?: number | null,
+): Promise<TotpCheck> {
   const cleaned = token.replace(/\s+/g, '');
   if (!/^\d{6}$/.test(cleaned)) return { valid: false };
   const result = await verify({

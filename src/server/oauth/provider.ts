@@ -32,14 +32,30 @@ export const INTERACTION_PATH = `${OAUTH_MOUNT}/interaction`;
 let provider: Provider | undefined;
 
 async function signingKeys() {
-  const [row] = await db().select().from(systemKeys).where(eq(systemKeys.id, 'oauth_jwks')).limit(1);
+  const [row] = await db()
+    .select()
+    .from(systemKeys)
+    .where(eq(systemKeys.id, 'oauth_jwks'))
+    .limit(1);
   if (row) return JSON.parse(decryptSecret(row.valueEnc)) as { keys: Record<string, unknown>[] };
   const { privateKey } = await generateKeyPair('ES256', { extractable: true });
-  const jwk = { ...(await exportJWK(privateKey)), use: 'sig', alg: 'ES256', kid: `or-${Date.now().toString(36)}` };
+  const jwk = {
+    ...(await exportJWK(privateKey)),
+    use: 'sig',
+    alg: 'ES256',
+    kid: `or-${Date.now().toString(36)}`,
+  };
   const jwks = { keys: [jwk] };
-  await db().insert(systemKeys).values({ id: 'oauth_jwks', valueEnc: encryptSecret(JSON.stringify(jwks)) }).onConflictDoNothing();
+  await db()
+    .insert(systemKeys)
+    .values({ id: 'oauth_jwks', valueEnc: encryptSecret(JSON.stringify(jwks)) })
+    .onConflictDoNothing();
   // Another replica may have won the race; always use the stored value.
-  const [stored] = await db().select().from(systemKeys).where(eq(systemKeys.id, 'oauth_jwks')).limit(1);
+  const [stored] = await db()
+    .select()
+    .from(systemKeys)
+    .where(eq(systemKeys.id, 'oauth_jwks'))
+    .limit(1);
   return JSON.parse(decryptSecret(stored!.valueEnc)) as { keys: Record<string, unknown>[] };
 }
 
@@ -55,7 +71,12 @@ export function isOurResource(resource: string): boolean {
     const want = new URL(config().mcpResourceUrl);
     const got = new URL(resource);
     // Scheme and host compare case-insensitively (URL normalises them); path exactly.
-    return got.origin === want.origin && got.pathname.replace(/\/+$/, '') === want.pathname.replace(/\/+$/, '') && !got.search && !got.hash;
+    return (
+      got.origin === want.origin &&
+      got.pathname.replace(/\/+$/, '') === want.pathname.replace(/\/+$/, '') &&
+      !got.search &&
+      !got.hash
+    );
   } catch {
     return false;
   }
@@ -113,7 +134,9 @@ export async function buildProvider(): Promise<Provider> {
         useGrantedResource: async () => true,
         getResourceServerInfo: async (_ctx: KoaContextWithOIDC, resourceIndicator: string) => {
           if (!isOurResource(resourceIndicator)) {
-            throw new errors.InvalidTarget('This authorisation server only issues tokens for the OpenRampart MCP server');
+            throw new errors.InvalidTarget(
+              'This authorisation server only issues tokens for the OpenRampart MCP server',
+            );
           }
           return {
             scope: RESOURCE_SCOPE,
@@ -144,13 +167,18 @@ export async function buildProvider(): Promise<Provider> {
       url: async (_ctx, interaction) => `${INTERACTION_PATH}/${interaction.uid}`,
     },
     async findAccount(_ctx, sub) {
-      const [user] = await db().select({ id: users.id, disabledAt: users.disabledAt }).from(users).where(eq(users.id, sub)).limit(1);
+      const [user] = await db()
+        .select({ id: users.id, disabledAt: users.disabledAt })
+        .from(users)
+        .where(eq(users.id, sub))
+        .limit(1);
       if (!user || user.disabledAt) return undefined;
       return { accountId: user.id, claims: async () => ({ sub: user.id }) };
     },
     async renderError(ctx, out) {
       ctx.type = 'html';
-      const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+      const esc = (s: unknown) =>
+        String(s ?? '').replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
       ctx.body = `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connection could not be authorised — OpenRampart</title><link rel="stylesheet" href="/oauth-error.css"></head><body><main><h1>This connection could not be authorised</h1><p>The application that sent you here made a request OpenRampart could not accept. No access has been granted.</p><dl><dt>Reason</dt><dd>${esc(out.error_description ?? out.error)}</dd></dl><p><a href="/">Return to OpenRampart</a></p></main></body></html>`;
     },
     extraClientMetadata: { properties: [] },

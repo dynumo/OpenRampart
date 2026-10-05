@@ -1,12 +1,27 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import type { AttachmentDTO, EventDetailDTO, IncidentDTO, RevisionDTO, TimestampDTO } from '../../shared/types';
+import type {
+  AttachmentDTO,
+  EventDetailDTO,
+  IncidentDTO,
+  RevisionDTO,
+  TimestampDTO,
+} from '../../shared/types';
 import { RiskBadge } from '../components/EventList';
 import { Icon, TYPE_ICONS } from '../components/Icon';
 import { PageHeader } from '../components/Layout';
 import { useToast } from '../components/Toasts';
-import { Alert, ConfirmDialog, Dialog, ErrorSummary, Loading, SelectField, StatusLine, TextField } from '../components/ui';
+import {
+  Alert,
+  ConfirmDialog,
+  Dialog,
+  ErrorSummary,
+  Loading,
+  SelectField,
+  StatusLine,
+  TextField,
+} from '../components/ui';
 import { api, apiUrl, attachmentUrl, uploadFile } from '../lib/api';
 import { useRecord } from '../lib/auth';
 import { bytes, DIRECTION_LABEL, formatDateTime, formatWhen, money } from '../lib/format';
@@ -16,22 +31,31 @@ export function TimestampStatus({ ts }: { ts: TimestampDTO | null }) {
   if (!ts) return <span className="muted">Not timestamped</span>;
   if (ts.status === 'complete')
     return (
-      <StatusLine ok>
-        Timestamp verified: existed by {formatDateTime(ts.attestedTime)}
-      </StatusLine>
+      <StatusLine ok>Timestamp verified: existed by {formatDateTime(ts.attestedTime)}</StatusLine>
     );
   if (ts.status === 'failed') return <StatusLine>Timestamp could not be completed</StatusLine>;
   return <StatusLine warn>Timestamp pending (usually completes within a few hours)</StatusLine>;
 }
 
-export function AttachmentGallery({ items, eventTitle }: { items: AttachmentDTO[]; eventTitle: string }) {
+export function AttachmentGallery({
+  items,
+  eventTitle,
+}: {
+  items: AttachmentDTO[];
+  eventTitle: string;
+}) {
   return (
     <ul className="gallery">
       {items.map((a, i) => (
         <li key={a.id}>
           <Link className="thumb" to={`/attachments/${a.id}`}>
             {a.hasThumbnail ? (
-              <img className="thumb-img" src={attachmentUrl(a.id, 'thumbnail')} alt="" loading="lazy" />
+              <img
+                className="thumb-img"
+                src={attachmentUrl(a.id, 'thumbnail')}
+                alt=""
+                loading="lazy"
+              />
             ) : (
               <span className="thumb-icon">
                 <Icon name={a.mimeType.startsWith('image/') ? 'image' : 'file'} />
@@ -46,7 +70,9 @@ export function AttachmentGallery({ items, eventTitle }: { items: AttachmentDTO[
               <span className="muted small">
                 {bytes(a.sizeBytes)}
                 {a.pageCount ? ` · ${a.pageCount} page${a.pageCount > 1 ? 's' : ''}` : ''}
-                {a.ocrStatus === 'pending' || a.ocrStatus === 'processing' ? ' · reading text…' : ''}
+                {a.ocrStatus === 'pending' || a.ocrStatus === 'processing'
+                  ? ' · reading text…'
+                  : ''}
                 {a.ocrStatus === 'failed' ? ' · text not readable' : ''}
               </span>
             </span>
@@ -58,13 +84,23 @@ export function AttachmentGallery({ items, eventTitle }: { items: AttachmentDTO[
 }
 
 function Revisions({ eventId, tz }: { eventId: string; tz: string }) {
-  const q = useQuery({ queryKey: ['revisions', eventId], queryFn: () => api<{ items: RevisionDTO[] }>(`/events/${eventId}/revisions`) });
+  const q = useQuery({
+    queryKey: ['revisions', eventId],
+    queryFn: () => api<{ items: RevisionDTO[] }>(`/events/${eventId}/revisions`),
+  });
   if (!q.data) return <Loading />;
   return (
     <ol className="plain-list" reversed>
       {q.data.items.map((r) => (
         <li key={r.revision}>
-          <strong>Revision {r.revision}</strong> — {r.changeKind === 'create' ? 'recorded' : r.changeKind === 'update' ? `changed ${r.changedFields.join(', ')}` : r.changeKind === 'delete' ? 'moved to trash' : 'restored'}{' '}
+          <strong>Revision {r.revision}</strong> —{' '}
+          {r.changeKind === 'create'
+            ? 'recorded'
+            : r.changeKind === 'update'
+              ? `changed ${r.changedFields.join(', ')}`
+              : r.changeKind === 'delete'
+                ? 'moved to trash'
+                : 'restored'}{' '}
           <span className="muted">
             by {r.createdBy?.displayName ?? 'unknown'} on {formatDateTime(r.createdAt, tz)}
             {r.createdVia === 'mcp' ? ' (through a connected application)' : ''}
@@ -84,13 +120,21 @@ function Revisions({ eventId, tz }: { eventId: string; tz: string }) {
             ) : null}
             {r.timestamp?.status === 'pending' || r.timestamp?.status === 'complete' ? (
               <p>
-                <a href={apiUrl(`/events/${eventId}/revisions/${r.revision}/timestamp.ots`)} download>
+                <a
+                  href={apiUrl(`/events/${eventId}/revisions/${r.revision}/timestamp.ots`)}
+                  download
+                >
                   Download OpenTimestamps proof (.ots)
                 </a>
               </p>
             ) : null}
             {r.canonical ? (
-              <pre className="ocr-text" tabIndex={0} aria-label={`Canonical JSON of revision ${r.revision}`}>
+              <pre
+                className="ocr-text"
+                tabIndex={0}
+                role="region"
+                aria-label={`Canonical JSON of revision ${r.revision}`}
+              >
                 {JSON.stringify(JSON.parse(r.canonical), null, 2)}
               </pre>
             ) : null}
@@ -113,7 +157,15 @@ export function EventDetailPage() {
     queryKey: ['event', id],
     queryFn: () => api<EventDetailDTO>(`/events/${id}`),
     // Poll while text recognition is still running so results appear without a reload.
-    refetchInterval: (query) => (query.state.data?.attachments.some((a) => a.ocrStatus === 'pending' || a.ocrStatus === 'processing' || a.derivativeStatus === 'pending') ? 4000 : false),
+    refetchInterval: (query) =>
+      query.state.data?.attachments.some(
+        (a) =>
+          a.ocrStatus === 'pending' ||
+          a.ocrStatus === 'processing' ||
+          a.derivativeStatus === 'pending',
+      )
+        ? 4000
+        : false,
   });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [incidentDialog, setIncidentDialog] = useState(false);
@@ -129,12 +181,17 @@ export function EventDetailPage() {
 
   return (
     <>
-      {params.get('captured') ? <Alert kind="success" title="Letter saved">The pages are stored as originals. Text is being read from them now.</Alert> : null}
+      {params.get('captured') ? (
+        <Alert kind="success" title="Letter saved">
+          The pages are stored as originals. Text is being read from them now.
+        </Alert>
+      ) : null}
       <PageHeader
         title={e.displayTitle}
         lede={
           <span className="row">
-            <Icon name={TYPE_ICONS[e.type.key] ?? 'file'} /> {e.type.label} · {formatWhen(e.occurredAt, e.occurredPrecision, tz)}
+            <Icon name={TYPE_ICONS[e.type.key] ?? 'file'} /> {e.type.label} ·{' '}
+            {formatWhen(e.occurredAt, e.occurredPrecision, tz)}
           </span>
         }
         actions={
@@ -214,7 +271,13 @@ export function EventDetailPage() {
               {e.dueOn ? (
                 <>
                   <dt>Due</dt>
-                  <dd>{new Date(`${e.dueOn}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</dd>
+                  <dd>
+                    {new Date(`${e.dueOn}T12:00:00Z`).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </dd>
                 </>
               ) : null}
               {e.riskLevel !== 'none' ? (
@@ -242,7 +305,11 @@ export function EventDetailPage() {
 
           <section className="card" aria-labelledby="att-h">
             <h2 id="att-h">Attachments ({e.attachments.length})</h2>
-            {e.attachments.length ? <AttachmentGallery items={e.attachments} eventTitle={e.displayTitle} /> : <p className="muted">No attachments.</p>}
+            {e.attachments.length ? (
+              <AttachmentGallery items={e.attachments} eventTitle={e.displayTitle} />
+            ) : (
+              <p className="muted">No attachments.</p>
+            )}
             {e.permissions.canAddAttachment ? (
               <div className="field" style={{ marginTop: '1rem' }}>
                 <label htmlFor="add-files">Add files</label>
@@ -295,7 +362,8 @@ export function EventDetailPage() {
               <ul className="plain-list">
                 {e.incidents.map((i) => (
                   <li key={i.id}>
-                    <Link to={`/incidents/${i.id}`}>{i.title}</Link> <span className="muted small">({i.status})</span>
+                    <Link to={`/incidents/${i.id}`}>{i.title}</Link>{' '}
+                    <span className="muted small">({i.status})</span>
                   </li>
                 ))}
               </ul>
@@ -324,7 +392,8 @@ export function EventDetailPage() {
                           toast('Relationship removed');
                         }}
                       >
-                        Remove relationship<span className="visually-hidden"> with {r.displayTitle}</span>
+                        Remove relationship
+                        <span className="visually-hidden"> with {r.displayTitle}</span>
                       </button>
                     ) : null}
                   </li>
@@ -337,8 +406,14 @@ export function EventDetailPage() {
           {e.permissions.canDelete ? (
             <section className="card">
               <h2>Delete</h2>
-              <p className="small">Deleted Events go to the trash and can be restored for a limited time.</p>
-              <button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)}>
+              <p className="small">
+                Deleted Events go to the trash and can be restored for a limited time.
+              </p>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setConfirmDelete(true)}
+              >
                 <Icon name="trash" /> Move to trash
               </button>
             </section>
@@ -349,7 +424,12 @@ export function EventDetailPage() {
       <ConfirmDialog
         open={confirmDelete}
         title="Move this Event to the trash?"
-        body={<p>“{e.displayTitle}” and its attachments will be hidden from your record. You can restore them from Settings → Storage → Trash until they are permanently removed.</p>}
+        body={
+          <p>
+            “{e.displayTitle}” and its attachments will be hidden from your record. You can restore
+            them from Settings → Storage → Trash until they are permanently removed.
+          </p>
+        }
         confirmLabel="Move to trash"
         danger
         onClose={() => setConfirmDelete(false)}
@@ -360,14 +440,38 @@ export function EventDetailPage() {
           navigate('/');
         }}
       />
-      <AddToIncidentDialog open={incidentDialog} onClose={() => setIncidentDialog(false)} eventIds={[e.id]} onDone={refresh} />
-      <RelateDialog open={relateDialog} onClose={() => setRelateDialog(false)} eventId={e.id} onDone={refresh} />
+      <AddToIncidentDialog
+        open={incidentDialog}
+        onClose={() => setIncidentDialog(false)}
+        eventIds={[e.id]}
+        onDone={refresh}
+      />
+      <RelateDialog
+        open={relateDialog}
+        onClose={() => setRelateDialog(false)}
+        eventId={e.id}
+        onDone={refresh}
+      />
     </>
   );
 }
 
-export function AddToIncidentDialog({ open, onClose, eventIds, onDone }: { open: boolean; onClose: () => void; eventIds: string[]; onDone: () => void }) {
-  const incidents = useQuery({ queryKey: ['incidents', 'pick'], queryFn: () => api<{ items: IncidentDTO[] }>('/incidents'), enabled: open });
+export function AddToIncidentDialog({
+  open,
+  onClose,
+  eventIds,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  eventIds: string[];
+  onDone: () => void;
+}) {
+  const incidents = useQuery({
+    queryKey: ['incidents', 'pick'],
+    queryFn: () => api<{ items: IncidentDTO[] }>('/incidents'),
+    enabled: open,
+  });
   const [choice, setChoice] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [error, setError] = useState<unknown>(null);
@@ -390,7 +494,10 @@ export function AddToIncidentDialog({ open, onClose, eventIds, onDone }: { open:
               setError(null);
               try {
                 if (choice === 'new') {
-                  const inc = await api<IncidentDTO>('/incidents', { method: 'POST', body: { title: newTitle, eventIds } });
+                  const inc = await api<IncidentDTO>('/incidents', {
+                    method: 'POST',
+                    body: { title: newTitle, eventIds },
+                  });
                   onClose();
                   onDone();
                   navigate(`/incidents/${inc.id}`);
@@ -415,27 +522,68 @@ export function AddToIncidentDialog({ open, onClose, eventIds, onDone }: { open:
         label="Incident"
         value={choice}
         onChange={setChoice}
-        options={[{ value: '', label: 'Choose…' }, { value: 'new', label: 'Create a new Incident' }, ...(incidents.data?.items ?? []).map((i) => ({ value: i.id, label: `${i.title} (${i.status})` }))]}
+        options={[
+          { value: '', label: 'Choose…' },
+          { value: 'new', label: 'Create a new Incident' },
+          ...(incidents.data?.items ?? []).map((i) => ({
+            value: i.id,
+            label: `${i.title} (${i.status})`,
+          })),
+        ]}
       />
-      {choice === 'new' ? <TextField label="New Incident title" value={newTitle} onChange={setNewTitle} hint="For example “Incorrect credit card arrears”." /> : null}
+      {choice === 'new' ? (
+        <TextField
+          label="New Incident title"
+          value={newTitle}
+          onChange={setNewTitle}
+          hint="For example “Incorrect credit card arrears”."
+        />
+      ) : null}
     </Dialog>
   );
 }
 
-function RelateDialog({ open, onClose, eventId, onDone }: { open: boolean; onClose: () => void; eventId: string; onDone: () => void }) {
+function RelateDialog({
+  open,
+  onClose,
+  eventId,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  eventId: string;
+  onDone: () => void;
+}) {
   const [q, setQ] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<unknown>(null);
   const results = useQuery({
     queryKey: ['relate-search', q],
-    queryFn: () => api<{ items: { id: string; displayTitle: string; occurredAt: string }[] }>('/events', { query: { q, limit: 10 } }),
+    queryFn: () =>
+      api<{ items: { id: string; displayTitle: string; occurredAt: string }[] }>('/events', {
+        query: { q, limit: 10 },
+      }),
     enabled: open && q.length > 1,
   });
   const toast = useToast();
   return (
-    <Dialog open={open} title="Relate to another Event" onClose={onClose} actions={<button type="button" className="btn" onClick={onClose}>Close</button>}>
+    <Dialog
+      open={open}
+      title="Relate to another Event"
+      onClose={onClose}
+      actions={
+        <button type="button" className="btn" onClick={onClose}>
+          Close
+        </button>
+      }
+    >
       <ErrorSummary error={error} />
-      <TextField label="Find an Event" value={q} onChange={setQ} hint="Type words from its title, notes or Actors." />
+      <TextField
+        label="Find an Event"
+        value={q}
+        onChange={setQ}
+        hint="Type words from its title, notes or Actors."
+      />
       <TextField label="Note about the relationship" optional value={note} onChange={setNote} />
       <ul className="option-list" aria-label="Matching Events">
         {(results.data?.items ?? [])
@@ -447,7 +595,10 @@ function RelateDialog({ open, onClose, eventId, onDone }: { open: boolean; onClo
                 onClick={async () => {
                   setError(null);
                   try {
-                    await api(`/events/${eventId}/relations`, { method: 'POST', body: { eventId: r.id, note: note || null } });
+                    await api(`/events/${eventId}/relations`, {
+                      method: 'POST',
+                      body: { eventId: r.id, note: note || null },
+                    });
                     toast('Events related');
                     onDone();
                     onClose();
@@ -456,7 +607,10 @@ function RelateDialog({ open, onClose, eventId, onDone }: { open: boolean; onClo
                   }
                 }}
               >
-                Relate to “{r.displayTitle}” <span className="muted small">({new Date(r.occurredAt).toLocaleDateString('en-GB')})</span>
+                Relate to “{r.displayTitle}”{' '}
+                <span className="muted small">
+                  ({new Date(r.occurredAt).toLocaleDateString('en-GB')})
+                </span>
               </button>
             </li>
           ))}

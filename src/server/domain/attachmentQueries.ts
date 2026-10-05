@@ -76,7 +76,9 @@ export function toAttachmentDTO(r: AttachmentRow): AttachmentDTO {
     sizeBytes: Number(r.size_bytes),
     sha256: r.sha256,
     uploadedAt: iso(r.uploaded_at)!,
-    uploadedBy: r.uploaded_by ? { id: r.uploaded_by, displayName: r.uploaded_by_name ?? 'Unknown' } : null,
+    uploadedBy: r.uploaded_by
+      ? { id: r.uploaded_by, displayName: r.uploaded_by_name ?? 'Unknown' }
+      : null,
     position: r.position,
     pageCount: r.page_count,
     width: r.width,
@@ -107,15 +109,24 @@ const SELECT = sql`
   LEFT JOIN users u ON u.id = att.uploaded_by
   LEFT JOIN timestamp_proofs tp ON tp.subject_type = 'attachment' AND tp.subject_id = att.id`;
 
-export async function attachmentsForEvents(ctx: AccessContext, eventIds: string[]): Promise<AttachmentRow[]> {
+export async function attachmentsForEvents(
+  ctx: AccessContext,
+  eventIds: string[],
+): Promise<AttachmentRow[]> {
   if (!eventIds.length) return [];
   return rows<AttachmentRow>(sql`${SELECT}
-    WHERE att.event_id IN (${sql.join(eventIds.map((id) => sql`${id}::uuid`), sql`, `)})
+    WHERE att.event_id IN (${sql.join(
+      eventIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )})
       AND ${attachmentVisible(ctx, 'att')}
     ORDER BY att.position, att.uploaded_at`);
 }
 
-export async function attachmentsForIncident(ctx: AccessContext, incidentId: string): Promise<AttachmentRow[]> {
+export async function attachmentsForIncident(
+  ctx: AccessContext,
+  incidentId: string,
+): Promise<AttachmentRow[]> {
   return rows<AttachmentRow>(sql`${SELECT}
     WHERE att.incident_id = ${incidentId}::uuid AND ${attachmentVisible(ctx, 'att')}
     ORDER BY att.position, att.uploaded_at`);

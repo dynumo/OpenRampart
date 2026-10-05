@@ -11,7 +11,11 @@ import { withOAuth } from '../../src/server/domain/context.js';
 import { createActor } from '../../src/server/domain/actors.js';
 import { createEvent } from '../../src/server/domain/events.js';
 import { createIncident } from '../../src/server/domain/incidents.js';
-import { inviteHelper, acceptInvitation, type GrantInput } from '../../src/server/domain/helpers.js';
+import {
+  inviteHelper,
+  acceptInvitation,
+  type GrantInput,
+} from '../../src/server/domain/helpers.js';
 import { createApp } from '../../src/server/http/app.js';
 import { decryptSecret } from '../../src/server/lib/crypto.js';
 
@@ -27,7 +31,13 @@ export function uniq(prefix = 'u'): string {
 
 export async function makeUser(name = uniq('user'), opts: { admin?: boolean } = {}) {
   const user = await createAccount(
-    { username: name, displayName: name, email: `${name}@example.test`, password: 'correct horse battery staple', timezone: 'Europe/London' },
+    {
+      username: name,
+      displayName: name,
+      email: `${name}@example.test`,
+      password: 'correct horse battery staple',
+      timezone: 'Europe/London',
+    },
     { ip: '127.0.0.1' },
     { viaInvitation: true, forceAdmin: opts.admin },
   );
@@ -69,17 +79,27 @@ export async function grantHelper(owner: AccessContext, grant: GrantInput) {
 }
 
 export async function totpCodeFor(userId: string): Promise<string> {
-  const rows = await db().execute(sql`SELECT totp_secret_enc, totp_pending_secret_enc FROM users WHERE id = ${userId}::uuid`);
-  const row = rows.rows[0] as { totp_secret_enc: string | null; totp_pending_secret_enc: string | null };
+  const rows = await db().execute(
+    sql`SELECT totp_secret_enc, totp_pending_secret_enc FROM users WHERE id = ${userId}::uuid`,
+  );
+  const row = rows.rows[0] as {
+    totp_secret_enc: string | null;
+    totp_pending_secret_enc: string | null;
+  };
   const enc = row.totp_pending_secret_enc ?? row.totp_secret_enc;
   return generate({ secret: decryptSecret(enc!) });
 }
 
 /** Code for the *next* time step, to avoid replay rejection in consecutive logins. */
 export async function nextTotpCode(userId: string, offsetSeconds = 30): Promise<string> {
-  const rows = await db().execute(sql`SELECT totp_secret_enc FROM users WHERE id = ${userId}::uuid`);
+  const rows = await db().execute(
+    sql`SELECT totp_secret_enc FROM users WHERE id = ${userId}::uuid`,
+  );
   const row = rows.rows[0] as { totp_secret_enc: string };
-  return generate({ secret: decryptSecret(row.totp_secret_enc), epoch: Math.floor(Date.now() / 1000) + offsetSeconds });
+  return generate({
+    secret: decryptSecret(row.totp_secret_enc),
+    epoch: Math.floor(Date.now() / 1000) + offsetSeconds,
+  });
 }
 
 export interface Browser {
@@ -96,14 +116,32 @@ export async function registerBrowser(username = uniq('web'), base?: string): Pr
   await agent
     .post('/api/auth/register')
     .set('X-CSRF-Token', '1')
-    .send({ username, displayName: username, email: `${username}@example.test`, password: 'a long enough passphrase', timezone: 'Europe/London' })
+    .send({
+      username,
+      displayName: username,
+      email: `${username}@example.test`,
+      password: 'a long enough passphrase',
+      timezone: 'Europe/London',
+    })
     .expect(201);
   let state = (await agent.get('/api/auth/state')).body;
   await agent.post('/api/auth/totp/begin').set('X-CSRF-Token', state.csrfToken).expect(200);
-  const userRow = await db().execute(sql`SELECT id FROM users WHERE lower(username) = lower(${username})`);
+  const userRow = await db().execute(
+    sql`SELECT id FROM users WHERE lower(username) = lower(${username})`,
+  );
   const userId = (userRow.rows[0] as { id: string }).id;
   const code = await totpCodeFor(userId);
-  const confirm = await agent.post('/api/auth/totp/confirm').set('X-CSRF-Token', state.csrfToken).send({ code }).expect(200);
+  const confirm = await agent
+    .post('/api/auth/totp/confirm')
+    .set('X-CSRF-Token', state.csrfToken)
+    .send({ code })
+    .expect(200);
   state = (await agent.get('/api/auth/state')).body;
-  return { agent, csrf: state.csrfToken, userId, username, recoveryCodes: confirm.body.recoveryCodes };
+  return {
+    agent,
+    csrf: state.csrfToken,
+    userId,
+    username,
+    recoveryCodes: confirm.body.recoveryCodes,
+  };
 }

@@ -64,7 +64,11 @@ export function queue(): PgBoss {
   return boss;
 }
 
-export async function enqueue(name: QueueName, data: Record<string, unknown>, options: Record<string, unknown> = {}) {
+export async function enqueue(
+  name: QueueName,
+  data: Record<string, unknown>,
+  options: Record<string, unknown> = {},
+) {
   const b = boss ?? (await startQueue({ supervise: false }));
   return b.send(name, data, options as never);
 }

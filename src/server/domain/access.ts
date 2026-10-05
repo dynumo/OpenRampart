@@ -53,7 +53,11 @@ function dateClause(grant: ResolvedGrant, ctx: AccessContext, e: Alias): SQL {
 }
 
 /** Event (alias `e`) is visible through one specific grant. */
-export function eventVisibleViaGrant(grant: ResolvedGrant, ctx: AccessContext, e: Alias = 'e'): SQL {
+export function eventVisibleViaGrant(
+  grant: ResolvedGrant,
+  ctx: AccessContext,
+  e: Alias = 'e',
+): SQL {
   const dates = dateClause(grant, ctx, e);
   switch (grant.scopeType) {
     case 'all':
@@ -97,7 +101,11 @@ export function restrictContext(ctx: AccessContext, capability: 'add' | 'export'
 }
 
 /** SQL predicate: Event row aliased `e` is visible in this context. */
-export function eventVisible(ctx: AccessContext, e: Alias = 'e', opts: VisibilityOptions = {}): SQL {
+export function eventVisible(
+  ctx: AccessContext,
+  e: Alias = 'e',
+  opts: VisibilityOptions = {},
+): SQL {
   if (ctx.role === 'owner') return eventBase(ctx, e, Boolean(opts.includeDeleted));
   const grants = applicableGrants(ctx, opts);
   if (!grants.length) return sql`FALSE`;
@@ -141,7 +149,11 @@ export function actorLinkVisible(ctx: AccessContext, ea: Alias = 'ea', e: Alias 
  * SQL predicate: Actor `a` can be seen at all (at least by name). True when
  * fully accessible or when it appears, unredacted, on a visible Event.
  */
-export function actorVisible(ctx: AccessContext, a: Alias = 'a', opts: VisibilityOptions = {}): SQL {
+export function actorVisible(
+  ctx: AccessContext,
+  a: Alias = 'a',
+  opts: VisibilityOptions = {},
+): SQL {
   if (ctx.role === 'owner') return actorFullAccess(ctx, a, opts);
   return sql`(${actorFullAccess(ctx, a)} OR (${ident(a)}.owner_id = ${ctx.ownerId} AND ${ident(a)}.deleted_at IS NULL AND EXISTS (
     SELECT 1 FROM event_actors ea JOIN events e ON e.id = ea.event_id
@@ -153,7 +165,11 @@ export function actorVisible(ctx: AccessContext, a: Alias = 'a', opts: Visibilit
  * SQL predicate: the Actor aliased `a` is fully accessible (details, notes,
  * contact information and its own page) in this context.
  */
-export function actorFullAccess(ctx: AccessContext, a: Alias = 'a', opts: VisibilityOptions = {}): SQL {
+export function actorFullAccess(
+  ctx: AccessContext,
+  a: Alias = 'a',
+  opts: VisibilityOptions = {},
+): SQL {
   const base = opts.includeDeleted
     ? sql`${ident(a)}.owner_id = ${ctx.ownerId}`
     : sql`(${ident(a)}.owner_id = ${ctx.ownerId} AND ${ident(a)}.deleted_at IS NULL)`;
@@ -175,14 +191,21 @@ export function actorFullAccess(ctx: AccessContext, a: Alias = 'a', opts: Visibi
 }
 
 /** SQL predicate: Incident `i` is visible. */
-export function incidentVisible(ctx: AccessContext, i: Alias = 'i', opts: VisibilityOptions = {}): SQL {
-  const base = opts.includeDeleted && ctx.role === 'owner'
-    ? sql`${ident(i)}.owner_id = ${ctx.ownerId}`
-    : sql`(${ident(i)}.owner_id = ${ctx.ownerId} AND ${ident(i)}.deleted_at IS NULL)`;
+export function incidentVisible(
+  ctx: AccessContext,
+  i: Alias = 'i',
+  opts: VisibilityOptions = {},
+): SQL {
+  const base =
+    opts.includeDeleted && ctx.role === 'owner'
+      ? sql`${ident(i)}.owner_id = ${ctx.ownerId}`
+      : sql`(${ident(i)}.owner_id = ${ctx.ownerId} AND ${ident(i)}.deleted_at IS NULL)`;
   if (ctx.role === 'owner') return base;
   const grants = applicableGrants(ctx, opts);
   const clauses: SQL[] = [];
-  const ids = [...new Set(grants.filter((g) => g.scopeType === 'incidents').flatMap((g) => g.incidentIds))];
+  const ids = [
+    ...new Set(grants.filter((g) => g.scopeType === 'incidents').flatMap((g) => g.incidentIds)),
+  ];
   if (ids.length) clauses.push(sql`${ident(i)}.id IN (${idList(ids)})`);
   for (const g of grants.filter((g) => g.scopeType === 'all')) {
     if (!g.dateFrom && !g.dateTo) clauses.push(sql`TRUE`);
@@ -196,8 +219,13 @@ export function incidentVisible(ctx: AccessContext, i: Alias = 'i', opts: Visibi
 }
 
 /** SQL predicate: Attachment `att` is visible (metadata level). */
-export function attachmentVisible(ctx: AccessContext, att: Alias = 'att', opts: VisibilityOptions = {}): SQL {
-  const deleted = opts.includeDeleted && ctx.role === 'owner' ? sql`TRUE` : sql`${ident(att)}.deleted_at IS NULL`;
+export function attachmentVisible(
+  ctx: AccessContext,
+  att: Alias = 'att',
+  opts: VisibilityOptions = {},
+): SQL {
+  const deleted =
+    opts.includeDeleted && ctx.role === 'owner' ? sql`TRUE` : sql`${ident(att)}.deleted_at IS NULL`;
   return sql`(${ident(att)}.owner_id = ${ctx.ownerId} AND ${deleted} AND (
     (${ident(att)}.event_id IS NOT NULL AND EXISTS (SELECT 1 FROM events e2 WHERE e2.id = ${ident(att)}.event_id AND ${eventVisible(ctx, 'e2', opts)}))
     OR
@@ -269,7 +297,14 @@ export async function resolveContext(req: ContextRequest): Promise<AccessContext
     .where(eq(users.id, ownerId))
     .limit(1);
   if (!owner || owner.disabledAt) throw new NotFoundError('Record');
-  const common = { userId: req.userId, ownerId, ownerTimezone: owner.timezone, via: req.via, ip: req.ip, userAgent: req.userAgent };
+  const common = {
+    userId: req.userId,
+    ownerId,
+    ownerTimezone: owner.timezone,
+    via: req.via,
+    ip: req.ip,
+    userAgent: req.userAgent,
+  };
   if (ownerId === req.userId) return { ...common, role: 'owner', grants: [] };
   const grants = await loadGrants(req.userId, ownerId);
   if (!grants.length) throw new NotFoundError('Record');

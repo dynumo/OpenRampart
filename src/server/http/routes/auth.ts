@@ -18,7 +18,12 @@ import {
 } from '../../auth/accounts.js';
 import * as rate from '../../auth/rateLimit.js';
 import { remainingRecoveryCodes } from '../../auth/recoveryCodes.js';
-import { createSession, listSessions, revokeAllSessions, revokeSession } from '../../auth/sessions.js';
+import {
+  createSession,
+  listSessions,
+  revokeAllSessions,
+  revokeSession,
+} from '../../auth/sessions.js';
 import { config } from '../../config.js';
 import { sharedRecords } from '../../domain/access.js';
 import { audit } from '../../domain/audit.js';
@@ -69,9 +74,15 @@ export function authRouter(): Router {
       ...base,
       stage: session.stage,
       csrfToken: session.csrfToken,
-      user: session.stage === 'active' ? toPublicUser(user) : { displayName: user.displayName, username: user.username },
+      user:
+        session.stage === 'active'
+          ? toPublicUser(user)
+          : { displayName: user.displayName, username: user.username },
       sharedRecords: session.stage === 'active' ? await sharedRecords(user.id) : [],
-      recoveryCodesRemaining: session.stage === 'active' && user.totpEnabledAt ? await remainingRecoveryCodes(user.id) : null,
+      recoveryCodesRemaining:
+        session.stage === 'active' && user.totpEnabledAt
+          ? await remainingRecoveryCodes(user.id)
+          : null,
     });
   });
 
@@ -86,7 +97,10 @@ export function authRouter(): Router {
   });
 
   r.post('/login', async (req, res) => {
-    const input = body(z.object({ login: z.string().min(1).max(320), password: z.string().min(1).max(256) }), req.body);
+    const input = body(
+      z.object({ login: z.string().min(1).max(320), password: z.string().min(1).max(256) }),
+      req.body,
+    );
     const result = await loginWithPassword(input.login, input.password, requestMeta(req));
     setSessionCookie(res, result.token, result.stage);
     res.json({ stage: result.stage });
@@ -97,7 +111,11 @@ export function authRouter(): Router {
     const { session, user } = locals(res);
     const result = await verifySecondFactor(session!.id, user!, input.code, requestMeta(req));
     setSessionCookie(res, result.token, 'active');
-    res.json({ stage: 'active', usedRecoveryCode: result.usedRecoveryCode, remainingRecoveryCodes: result.remainingRecoveryCodes ?? null });
+    res.json({
+      stage: 'active',
+      usedRecoveryCode: result.usedRecoveryCode,
+      remainingRecoveryCodes: result.remainingRecoveryCodes ?? null,
+    });
   });
 
   r.post('/totp/begin', requireStage('totp_setup', 'active'), async (_req, res) => {
@@ -105,7 +123,10 @@ export function authRouter(): Router {
   });
 
   r.post('/totp/confirm', requireStage('totp_setup', 'active'), async (req, res) => {
-    const input = body(z.object({ code: z.string().min(1).max(20), currentCode: z.string().max(20).optional() }), req.body);
+    const input = body(
+      z.object({ code: z.string().min(1).max(20), currentCode: z.string().max(20).optional() }),
+      req.body,
+    );
     const { session } = locals(res);
     const user = (await getUser(locals(res).user!.id))!;
     const result = await confirmTotpSetup(user, input.code, requestMeta(req), {
@@ -123,27 +144,47 @@ export function authRouter(): Router {
     const { session, user } = locals(res);
     if (session) {
       await revokeSession(session.id, 'logout');
-      await audit({ action: 'auth.logout', ownerId: user?.id, actorUserId: user?.id, ...requestMeta(req) });
+      await audit({
+        action: 'auth.logout',
+        ownerId: user?.id,
+        actorUserId: user?.id,
+        ...requestMeta(req),
+      });
     }
     clearSessionCookie(res);
     res.json({ ok: true });
   });
 
   r.post('/password', requireUser, async (req, res) => {
-    const input = body(z.object({ currentPassword: z.string().max(256), newPassword: z.string().max(256) }), req.body);
+    const input = body(
+      z.object({ currentPassword: z.string().max(256), newPassword: z.string().max(256) }),
+      req.body,
+    );
     const { user, session } = locals(res);
-    const { token } = await changePassword(user!, input.currentPassword, input.newPassword, { ...requestMeta(req), sessionId: session!.id });
+    const { token } = await changePassword(user!, input.currentPassword, input.newPassword, {
+      ...requestMeta(req),
+      sessionId: session!.id,
+    });
     setSessionCookie(res, token, 'active');
     res.json({ ok: true });
   });
 
   r.post('/recovery-codes', requireUser, async (req, res) => {
     const input = body(z.object({ password: z.string().max(256) }), req.body);
-    res.json({ recoveryCodes: await newRecoveryCodes(locals(res).user!, input.password, requestMeta(req)) });
+    res.json({
+      recoveryCodes: await newRecoveryCodes(locals(res).user!, input.password, requestMeta(req)),
+    });
   });
 
   r.patch('/profile', requireUser, async (req, res) => {
-    const input = body(z.object({ displayName: z.string().max(120).optional(), email: z.string().max(320).nullish(), timezone: z.string().max(64).optional() }), req.body);
+    const input = body(
+      z.object({
+        displayName: z.string().max(120).optional(),
+        email: z.string().max(320).nullish(),
+        timezone: z.string().max(64).optional(),
+      }),
+      req.body,
+    );
     const user = await updateProfile(locals(res).user!, input);
     res.json({ user: toPublicUser(user) });
   });
@@ -158,14 +199,27 @@ export function authRouter(): Router {
     const { user } = locals(res);
     const ok = await revokeSession(String(req.params.id), 'revoked_by_user', user!.id);
     if (!ok) throw new ValidationError('That session was not found');
-    await audit({ action: 'session.revoked', ownerId: user!.id, actorUserId: user!.id, targetType: 'session', targetId: String(req.params.id), ...requestMeta(req) });
+    await audit({
+      action: 'session.revoked',
+      ownerId: user!.id,
+      actorUserId: user!.id,
+      targetType: 'session',
+      targetId: String(req.params.id),
+      ...requestMeta(req),
+    });
     res.json({ ok: true });
   });
 
   r.post('/sessions/revoke-others', requireUser, async (req, res) => {
     const { user, session } = locals(res);
     const count = await revokeAllSessions(user!.id, 'revoked_by_user', session!.id);
-    await audit({ action: 'session.revoked', ownerId: user!.id, actorUserId: user!.id, ...requestMeta(req), metadata: { count, allOthers: true } });
+    await audit({
+      action: 'session.revoked',
+      ownerId: user!.id,
+      actorUserId: user!.id,
+      ...requestMeta(req),
+      metadata: { count, allOthers: true },
+    });
     res.json({ revoked: count });
   });
 
@@ -176,7 +230,10 @@ export function authRouter(): Router {
   });
 
   r.post('/password-reset/complete', async (req, res) => {
-    const input = body(z.object({ token: z.string().min(10).max(100), password: z.string().max(256) }), req.body);
+    const input = body(
+      z.object({ token: z.string().min(10).max(100), password: z.string().max(256) }),
+      req.body,
+    );
     await completePasswordReset(input.token, input.password, requestMeta(req));
     res.json({ ok: true });
   });
@@ -194,7 +251,11 @@ export function invitationRouter(): Router {
 
   r.post('/:token/accept', requireUser, async (req, res) => {
     await rate.hit('invitation', req.ip ?? 'unknown');
-    const result = await acceptInvitation(String(req.params.token), locals(res).user!.id, requestMeta(req));
+    const result = await acceptInvitation(
+      String(req.params.token),
+      locals(res).user!.id,
+      requestMeta(req),
+    );
     res.json(result);
   });
 
@@ -203,7 +264,8 @@ export function invitationRouter(): Router {
     await rate.hit('invitation', req.ip ?? 'unknown');
     const token = String(req.params.token);
     const state = await describeInvitation(token);
-    if (state.state !== 'valid') throw new ValidationError('This invitation link is no longer valid. Ask for a new one.');
+    if (state.state !== 'valid')
+      throw new ValidationError('This invitation link is no longer valid. Ask for a new one.');
     const input = body(accountSchema, req.body);
     const user = await createAccount(input, requestMeta(req), { viaInvitation: true });
     await acceptInvitation(token, user.id, requestMeta(req));
@@ -218,7 +280,8 @@ export function invitationRouter(): Router {
 
 export function requireNoSession() {
   return (_req: unknown, res: import('express').Response, next: import('express').NextFunction) => {
-    if (locals(res).session?.stage === 'active') return next(new UnauthenticatedError('Already signed in'));
+    if (locals(res).session?.stage === 'active')
+      return next(new UnauthenticatedError('Already signed in'));
     next();
   };
 }

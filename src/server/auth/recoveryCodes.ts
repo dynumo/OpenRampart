@@ -31,7 +31,10 @@ export function looksLikeRecoveryCode(input: string): boolean {
 }
 
 /** Replace all of a user's recovery codes. Returns the new plaintext codes. */
-export async function regenerateRecoveryCodes(userId: string, executor: Executor = db()): Promise<string[]> {
+export async function regenerateRecoveryCodes(
+  userId: string,
+  executor: Executor = db(),
+): Promise<string[]> {
   const codes = Array.from({ length: RECOVERY_CODE_COUNT }, generateCode);
   await executor.delete(recoveryCodes).where(eq(recoveryCodes.userId, userId));
   await executor

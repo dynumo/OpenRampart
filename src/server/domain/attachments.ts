@@ -42,7 +42,8 @@ async function assertCanAttachToEvent(ctx: AccessContext, eventId: string): Prom
   const [ok] = await rows<{ id: string }>(
     sql`SELECT e.id FROM events e WHERE e.id = ${eventId}::uuid AND ${eventVisible(restrictContext(ctx, 'add'), 'e')}`,
   );
-  if (!ok) throw new ForbiddenError('Your access does not include adding attachments to this Event');
+  if (!ok)
+    throw new ForbiddenError('Your access does not include adding attachments to this Event');
 }
 
 /**
@@ -59,12 +60,15 @@ export async function storeAttachment(
   file: UploadedFile,
 ): Promise<AttachmentDTO> {
   requireScopes(ctx, 'attachments:write');
-  if (Boolean(target.eventId) === Boolean(target.incidentId)) throw new ValidationError('Attach to an Event or an Incident');
+  if (Boolean(target.eventId) === Boolean(target.incidentId))
+    throw new ValidationError('Attach to an Event or an Incident');
   if (target.eventId) await assertCanAttachToEvent(ctx, target.eventId);
   if (target.incidentId) {
     if (!isOwner(ctx)) throw new ForbiddenError('Only the owner can attach files to an Incident');
     if (!isUuid(target.incidentId)) throw new NotFoundError('Incident');
-    const [inc] = await rows<{ id: string }>(sql`SELECT i.id FROM incidents i WHERE i.id = ${target.incidentId}::uuid AND ${incidentVisible(ctx, 'i')}`);
+    const [inc] = await rows<{ id: string }>(
+      sql`SELECT i.id FROM incidents i WHERE i.id = ${target.incidentId}::uuid AND ${incidentVisible(ctx, 'i')}`,
+    );
     if (!inc) throw new NotFoundError('Incident');
   }
   if (file.sizeBytes > config().maxUploadBytes) {
@@ -98,11 +102,18 @@ export async function storeAttachment(
         sha256: file.sha256,
         uploadedBy: ctx.userId,
         derivativeStatus: derivativesApplicable(type.category) ? 'pending' : 'not_applicable',
-        ocrStatus: !ocrApplicable(type.category) ? 'not_applicable' : ocrEnabled ? 'pending' : 'disabled',
+        ocrStatus: !ocrApplicable(type.category)
+          ? 'not_applicable'
+          : ocrEnabled
+            ? 'pending'
+            : 'disabled',
       });
       await queueTimestamp(tx, ctx.ownerId, 'attachment', id, file.sha256);
       if (target.eventId) {
-        await tx.update(events).set({ updatedAt: new Date(), updatedBy: ctx.userId }).where(eq(events.id, target.eventId));
+        await tx
+          .update(events)
+          .set({ updatedAt: new Date(), updatedBy: ctx.userId })
+          .where(eq(events.id, target.eventId));
         await appendRevision(tx, {
           eventId: target.eventId,
           ownerId: ctx.ownerId,
@@ -112,12 +123,25 @@ export async function storeAttachment(
           via: ctx.via,
         });
       } else {
-        await tx.update(incidents).set({ updatedAt: new Date() }).where(eq(incidents.id, target.incidentId!));
+        await tx
+          .update(incidents)
+          .set({ updatedAt: new Date() })
+          .where(eq(incidents.id, target.incidentId!));
       }
       await auditCtx(
         ctx,
         'attachment.uploaded',
-        { type: 'attachment', id, metadata: { eventId: target.eventId, incidentId: target.incidentId, mimeType: type.mimeType, sizeBytes: file.sizeBytes, sha256: file.sha256 } },
+        {
+          type: 'attachment',
+          id,
+          metadata: {
+            eventId: target.eventId,
+            incidentId: target.incidentId,
+            mimeType: type.mimeType,
+            sizeBytes: file.sizeBytes,
+            sha256: file.sha256,
+          },
+        },
         tx,
       );
     });
@@ -127,7 +151,10 @@ export async function storeAttachment(
   }
   if (derivativesApplicable(type.category) || (ocrApplicable(type.category) && ocrEnabled)) {
     await enqueue(QUEUES.processAttachment, { attachmentId: id }).catch((err) =>
-      logger.error({ err: (err as Error).message, attachmentId: id }, 'could not queue attachment processing'),
+      logger.error(
+        { err: (err as Error).message, attachmentId: id },
+        'could not queue attachment processing',
+      ),
     );
   }
   const row = await attachmentRow(ctx, id);
@@ -158,11 +185,20 @@ export async function openAttachment(
   if (!isUuid(id)) throw new NotFoundError('Attachment');
   const row = await attachmentRow(ctx, id);
   if (!row) throw new NotFoundError('Attachment');
-  const key = variant === 'original' ? row.storage_key : variant === 'thumbnail' ? row.thumbnail_key : row.preview_key;
+  const key =
+    variant === 'original'
+      ? row.storage_key
+      : variant === 'thumbnail'
+        ? row.thumbnail_key
+        : row.preview_key;
   if (!key) throw new NotFoundError('Preview');
   const stream = await getObjectStream(key, variant === 'original' ? range : undefined);
   if (variant === 'original' && !range) {
-    await auditCtx(ctx, 'attachment.downloaded', { type: 'attachment', id, metadata: { eventId: row.event_id, incidentId: row.incident_id } });
+    await auditCtx(ctx, 'attachment.downloaded', {
+      type: 'attachment',
+      id,
+      metadata: { eventId: row.event_id, incidentId: row.incident_id },
+    });
   }
   return {
     ...stream,
@@ -200,9 +236,11 @@ export async function getAttachmentText(ctx: AccessContext, id: string): Promise
     const ids = s.actors.map((a) => a.actorId).filter((v): v is string => Boolean(v));
     const allowed = ids.length
       ? new Set(
-          (await rows<{ id: string; name: string }>(sql`SELECT a.id, a.name FROM actors a WHERE a.id IN (${uuidList(ids)}) AND ${actorFullAccess(ctx, 'a')}`)).map(
-            (r) => r.id,
-          ),
+          (
+            await rows<{ id: string; name: string }>(
+              sql`SELECT a.id, a.name FROM actors a WHERE a.id IN (${uuidList(ids)}) AND ${actorFullAccess(ctx, 'a')}`,
+            )
+          ).map((r) => r.id),
         )
       : new Set<string>();
     suggestions = {
@@ -225,38 +263,70 @@ export async function getAttachmentText(ctx: AccessContext, id: string): Promise
 }
 
 /** Store corrected OCR text. The original file and the machine OCR text are kept. */
-export async function correctAttachmentText(ctx: AccessContext, id: string, text: string | null): Promise<AttachmentText> {
+export async function correctAttachmentText(
+  ctx: AccessContext,
+  id: string,
+  text: string | null,
+): Promise<AttachmentText> {
   requireScopes(ctx, 'attachments:write');
   if (!isUuid(id)) throw new NotFoundError('Attachment');
   const row = await attachmentRow(ctx, id);
   if (!row) throw new NotFoundError('Attachment');
   if (!isOwner(ctx) && row.uploaded_by !== ctx.userId) {
-    throw new ForbiddenError('Only the owner, or the person who uploaded this file, can correct its text');
+    throw new ForbiddenError(
+      'Only the owner, or the person who uploaded this file, can correct its text',
+    );
   }
-  if (text !== null && text.length > 2_000_000) throw new ValidationError('The corrected text is too long');
+  if (text !== null && text.length > 2_000_000)
+    throw new ValidationError('The corrected text is too long');
   await db()
     .update(attachments)
-    .set({ ocrCorrectedText: text, ocrCorrectedBy: text === null ? null : ctx.userId, ocrCorrectedAt: text === null ? null : new Date() })
+    .set({
+      ocrCorrectedText: text,
+      ocrCorrectedBy: text === null ? null : ctx.userId,
+      ocrCorrectedAt: text === null ? null : new Date(),
+    })
     .where(eq(attachments.id, id));
-  await auditCtx(ctx, 'attachment.ocr_corrected', { type: 'attachment', id, metadata: { reverted: text === null } });
+  await auditCtx(ctx, 'attachment.ocr_corrected', {
+    type: 'attachment',
+    id,
+    metadata: { reverted: text === null },
+  });
   return getAttachmentText(ctx, id);
 }
 
 export async function deleteAttachment(ctx: AccessContext, id: string): Promise<void> {
   requireScopes(ctx, 'attachments:write');
-  if (!isOwner(ctx)) throw new ForbiddenError('Only the owner of this record can delete attachments');
+  if (!isOwner(ctx))
+    throw new ForbiddenError('Only the owner of this record can delete attachments');
   const row = await attachmentRow(ctx, id);
   if (!row) throw new NotFoundError('Attachment');
   const now = new Date();
   await db().transaction(async (tx) => {
     await tx
       .update(attachments)
-      .set({ deletedAt: now, deletedBy: ctx.userId, purgeAfter: new Date(now.getTime() + config().DELETION_RETENTION_DAYS * 86400_000) })
+      .set({
+        deletedAt: now,
+        deletedBy: ctx.userId,
+        purgeAfter: new Date(now.getTime() + config().DELETION_RETENTION_DAYS * 86400_000),
+      })
       .where(eq(attachments.id, id));
     if (row.event_id) {
-      await appendRevision(tx, { eventId: row.event_id, ownerId: ctx.ownerId, changeKind: 'update', changedFields: ['attachments'], userId: ctx.userId, via: ctx.via });
+      await appendRevision(tx, {
+        eventId: row.event_id,
+        ownerId: ctx.ownerId,
+        changeKind: 'update',
+        changedFields: ['attachments'],
+        userId: ctx.userId,
+        via: ctx.via,
+      });
     }
-    await auditCtx(ctx, 'attachment.deleted', { type: 'attachment', id, metadata: { eventId: row.event_id, incidentId: row.incident_id } }, tx);
+    await auditCtx(
+      ctx,
+      'attachment.deleted',
+      { type: 'attachment', id, metadata: { eventId: row.event_id, incidentId: row.incident_id } },
+      tx,
+    );
   });
 }
 
@@ -265,9 +335,19 @@ export async function restoreAttachment(ctx: AccessContext, id: string): Promise
   const row = await attachmentRow(ctx, id, { includeDeleted: true });
   if (!row) throw new NotFoundError('Attachment');
   await db().transaction(async (tx) => {
-    await tx.update(attachments).set({ deletedAt: null, deletedBy: null, purgeAfter: null }).where(eq(attachments.id, id));
+    await tx
+      .update(attachments)
+      .set({ deletedAt: null, deletedBy: null, purgeAfter: null })
+      .where(eq(attachments.id, id));
     if (row.event_id) {
-      await appendRevision(tx, { eventId: row.event_id, ownerId: ctx.ownerId, changeKind: 'update', changedFields: ['attachments'], userId: ctx.userId, via: ctx.via });
+      await appendRevision(tx, {
+        eventId: row.event_id,
+        ownerId: ctx.ownerId,
+        changeKind: 'update',
+        changedFields: ['attachments'],
+        userId: ctx.userId,
+        via: ctx.via,
+      });
     }
     await auditCtx(ctx, 'attachment.restored', { type: 'attachment', id }, tx);
   });
@@ -275,7 +355,11 @@ export async function restoreAttachment(ctx: AccessContext, id: string): Promise
 }
 
 /** Reorder an Event's attachments (e.g. pages of a letter). */
-export async function reorderAttachments(ctx: AccessContext, eventId: string, orderedIds: string[]): Promise<void> {
+export async function reorderAttachments(
+  ctx: AccessContext,
+  eventId: string,
+  orderedIds: string[],
+): Promise<void> {
   requireScopes(ctx, 'attachments:write');
   if (!isOwner(ctx)) throw new ForbiddenError();
   await assertCanAttachToEvent(ctx, eventId);
@@ -285,7 +369,13 @@ export async function reorderAttachments(ctx: AccessContext, eventId: string, or
       await tx
         .update(attachments)
         .set({ position: i })
-        .where(and(eq(attachments.id, id), eq(attachments.eventId, eventId), eq(attachments.ownerId, ctx.ownerId)));
+        .where(
+          and(
+            eq(attachments.id, id),
+            eq(attachments.eventId, eventId),
+            eq(attachments.ownerId, ctx.ownerId),
+          ),
+        );
     }
   });
 }
@@ -294,17 +384,30 @@ export async function reorderAttachments(ctx: AccessContext, eventId: string, or
  * Re-read the stored original and confirm its SHA-256 still matches the hash
  * recorded at upload ("Original unchanged").
  */
-export async function verifyAttachmentIntegrity(ctx: AccessContext, id: string): Promise<{ ok: boolean; checkedAt: string; sha256: string }> {
+export async function verifyAttachmentIntegrity(
+  ctx: AccessContext,
+  id: string,
+): Promise<{ ok: boolean; checkedAt: string; sha256: string }> {
   requireScopes(ctx, 'attachments:metadata');
   const row = await attachmentRow(ctx, id);
   if (!row) throw new NotFoundError('Attachment');
   const result = await checkStoredHash(row.id);
-  await auditCtx(ctx, 'attachment.integrity_checked', { type: 'attachment', id, metadata: { ok: result.ok } });
+  await auditCtx(ctx, 'attachment.integrity_checked', {
+    type: 'attachment',
+    id,
+    metadata: { ok: result.ok },
+  });
   return result;
 }
 
-export async function checkStoredHash(attachmentId: string): Promise<{ ok: boolean; checkedAt: string; sha256: string }> {
-  const [row] = await db().select().from(attachments).where(eq(attachments.id, attachmentId)).limit(1);
+export async function checkStoredHash(
+  attachmentId: string,
+): Promise<{ ok: boolean; checkedAt: string; sha256: string }> {
+  const [row] = await db()
+    .select()
+    .from(attachments)
+    .where(eq(attachments.id, attachmentId))
+    .limit(1);
   if (!row) throw new NotFoundError('Attachment');
   const { body } = await getObjectStream(row.storageKey);
   const hash = createHash('sha256');
@@ -312,7 +415,10 @@ export async function checkStoredHash(attachmentId: string): Promise<{ ok: boole
   const actual = hash.digest('hex');
   const ok = actual === row.sha256;
   const checkedAt = new Date();
-  await db().update(attachments).set({ integrityCheckedAt: checkedAt, integrityOk: ok }).where(eq(attachments.id, attachmentId));
+  await db()
+    .update(attachments)
+    .set({ integrityCheckedAt: checkedAt, integrityOk: ok })
+    .where(eq(attachments.id, attachmentId));
   if (!ok) logger.error({ attachmentId }, 'stored original does not match its recorded SHA-256');
   return { ok, checkedAt: checkedAt.toISOString(), sha256: row.sha256 };
 }

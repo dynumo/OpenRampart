@@ -73,7 +73,9 @@ export const eventInputSchema = z.object({
   amount: z
     .union([z.string(), z.number()])
     .nullish()
-    .transform((v) => (v === undefined ? undefined : v === null || v === '' ? null : String(v).trim())),
+    .transform((v) =>
+      v === undefined ? undefined : v === null || v === '' ? null : String(v).trim(),
+    ),
   currency: optionalText(3),
   reference: optionalText(200),
   dueOn: optionalText(10),
@@ -93,7 +95,8 @@ function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.output
   const result = schema.safeParse(input);
   if (!result.success) {
     const fields: Record<string, string> = {};
-    for (const issue of result.error.issues) fields[issue.path.join('.') || 'input'] = issue.message;
+    for (const issue of result.error.issues)
+      fields[issue.path.join('.') || 'input'] = issue.message;
     throw new ValidationError('Please check the details entered', fields);
   }
   return result.data;
@@ -111,7 +114,8 @@ function normaliseAmount(v: string | null | undefined): string | null | undefine
 function normaliseCurrency(v: string | null | undefined): string | null | undefined {
   if (v === undefined || v === null) return v;
   const c = v.toUpperCase();
-  if (!/^[A-Z]{3}$/.test(c)) throw new ValidationError('Invalid currency', { currency: 'Use a 3-letter code such as GBP' });
+  if (!/^[A-Z]{3}$/.test(c))
+    throw new ValidationError('Invalid currency', { currency: 'Use a 3-letter code such as GBP' });
   return c;
 }
 
@@ -236,13 +240,22 @@ async function actorLinks(ctx: AccessContext, eventIds: string[], executor?: Exe
 async function incidentLinks(ctx: AccessContext, eventIds: string[]) {
   const out = new Map<string, IncidentRef[]>();
   if (!eventIds.length) return out;
-  const list = await rows<{ event_id: string; id: string; title: string; status: IncidentRef['status'] }>(
+  const list = await rows<{
+    event_id: string;
+    id: string;
+    title: string;
+    status: IncidentRef['status'];
+  }>(
     sql`SELECT ie.event_id, i.id, i.title, i.status
         FROM incident_events ie JOIN incidents i ON i.id = ie.incident_id
         WHERE ie.event_id IN (${uuidList(eventIds)}) AND ${incidentVisible(ctx, 'i')}
         ORDER BY i.opened_on DESC`,
   );
-  for (const r of list) out.set(r.event_id, [...(out.get(r.event_id) ?? []), { id: r.id, title: r.title, status: r.status }]);
+  for (const r of list)
+    out.set(r.event_id, [
+      ...(out.get(r.event_id) ?? []),
+      { id: r.id, title: r.title, status: r.status },
+    ]);
   return out;
 }
 
@@ -260,7 +273,9 @@ async function attachmentCounts(ctx: AccessContext, eventIds: string[]) {
 
 export function displayTitle(title: string, typeLabel: string, actorList: EventActorDTO[]): string {
   if (title.trim()) return title.trim();
-  const named = actorList.find((a): a is Extract<EventActorDTO, { redacted: false }> => !a.redacted);
+  const named = actorList.find(
+    (a): a is Extract<EventActorDTO, { redacted: false }> => !a.redacted,
+  );
   return named ? `${typeLabel} — ${named.name}` : typeLabel;
 }
 
@@ -291,23 +306,33 @@ function toSummary(
     currency: r.currency,
     reference: r.reference,
     dueOn: r.due_on,
-    createdBy: r.created_by ? { id: r.created_by, displayName: r.created_by_name ?? 'Unknown' } : null,
+    createdBy: r.created_by
+      ? { id: r.created_by, displayName: r.created_by_name ?? 'Unknown' }
+      : null,
     createdVia: r.created_via,
   };
 }
 
 /** Build summaries for Event rows already known to be visible. */
-export async function summariesFor(ctx: AccessContext, eventRows: EventRow[]): Promise<EventSummaryDTO[]> {
+export async function summariesFor(
+  ctx: AccessContext,
+  eventRows: EventRow[],
+): Promise<EventSummaryDTO[]> {
   const ids = eventRows.map((r) => r.id);
   const [links, incidents, counts] = await Promise.all([
     actorLinks(ctx, ids),
     incidentLinks(ctx, ids),
     attachmentCounts(ctx, ids),
   ]);
-  return eventRows.map((r) => toSummary(r, links.get(r.id) ?? [], incidents.get(r.id) ?? [], counts.get(r.id) ?? 0));
+  return eventRows.map((r) =>
+    toSummary(r, links.get(r.id) ?? [], incidents.get(r.id) ?? [], counts.get(r.id) ?? 0),
+  );
 }
 
-export async function eventSummariesByIds(ctx: AccessContext, ids: string[]): Promise<Map<string, EventSummaryDTO>> {
+export async function eventSummariesByIds(
+  ctx: AccessContext,
+  ids: string[],
+): Promise<Map<string, EventSummaryDTO>> {
   if (!ids.length) return new Map();
   const list = await rows<EventRow>(
     sql`SELECT ${EVENT_COLUMNS} ${EVENT_FROM} WHERE e.id IN (${uuidList(ids)}) AND ${eventVisible(ctx, 'e')}`,
@@ -348,7 +373,8 @@ export function filterSql(ctx: AccessContext, f: EventFilters): SQL[] {
       );
   }
   const typeIds = cleanIds(f.typeIds);
-  if (f.typeIds?.length) where.push(typeIds.length ? sql`e.event_type_id IN (${uuidList(typeIds)})` : sql`FALSE`);
+  if (f.typeIds?.length)
+    where.push(typeIds.length ? sql`e.event_type_id IN (${uuidList(typeIds)})` : sql`FALSE`);
   const incidentIds = cleanIds(f.incidentIds);
   if (f.incidentIds?.length) {
     if (!incidentIds.length) where.push(sql`FALSE`);
@@ -367,13 +393,29 @@ export function filterSql(ctx: AccessContext, f: EventFilters): SQL[] {
     where.push(sql`${localDate} <= ${f.to}::date`);
   }
   if (f.hasAttachments) {
-    where.push(sql`EXISTS (SELECT 1 FROM attachments att WHERE att.event_id = e.id AND att.deleted_at IS NULL)`);
+    where.push(
+      sql`EXISTS (SELECT 1 FROM attachments att WHERE att.event_id = e.id AND att.deleted_at IS NULL)`,
+    );
   }
   const risks = (f.riskLevels ?? []).filter((r) => ['none', 'low', 'medium', 'high'].includes(r));
-  if (f.riskLevels?.length) where.push(risks.length ? sql`e.risk_level IN (${sql.join(risks.map((r) => sql`${r}`), sql`, `)})` : sql`FALSE`);
-  if (f.direction && ['inbound', 'outbound', 'internal'].includes(f.direction)) where.push(sql`e.direction = ${f.direction}`);
+  if (f.riskLevels?.length)
+    where.push(
+      risks.length
+        ? sql`e.risk_level IN (${sql.join(
+            risks.map((r) => sql`${r}`),
+            sql`, `,
+          )})`
+        : sql`FALSE`,
+    );
+  if (f.direction && ['inbound', 'outbound', 'internal'].includes(f.direction))
+    where.push(sql`e.direction = ${f.direction}`);
   if (f.tags?.length) {
-    where.push(sql`e.tags @> ${sql`ARRAY[${sql.join(f.tags.map((t) => sql`${t.toLowerCase()}`), sql`, `)}]::text[]`}`);
+    where.push(
+      sql`e.tags @> ${sql`ARRAY[${sql.join(
+        f.tags.map((t) => sql`${t.toLowerCase()}`),
+        sql`, `,
+      )}]::text[]`}`,
+    );
   }
   if (f.ids) {
     const ids = cleanIds(f.ids);
@@ -385,7 +427,12 @@ export function filterSql(ctx: AccessContext, f: EventFilters): SQL[] {
 export async function listEvents(
   ctx: AccessContext,
   filters: EventFilters,
-  page: { cursor?: string | null; limit?: number; order?: 'asc' | 'desc'; withTotal?: boolean } = {},
+  page: {
+    cursor?: string | null;
+    limit?: number;
+    order?: 'asc' | 'desc';
+    withTotal?: boolean;
+  } = {},
 ): Promise<Page<EventSummaryDTO>> {
   requireScopes(ctx, 'events:read');
   const limit = Math.min(Math.max(page.limit ?? 50, 1), 200);
@@ -400,25 +447,33 @@ export async function listEvents(
         : sql`(e.occurred_at, e.id) > (${cursor.o}::timestamptz, ${cursor.id}::uuid)`,
     );
   }
-  const orderSql = order === 'desc' ? sql`e.occurred_at DESC, e.id DESC` : sql`e.occurred_at ASC, e.id ASC`;
+  const orderSql =
+    order === 'desc' ? sql`e.occurred_at DESC, e.id DESC` : sql`e.occurred_at ASC, e.id ASC`;
   const list = await rows<EventRow>(
     sql`SELECT ${EVENT_COLUMNS} ${EVENT_FROM} WHERE ${sql.join(pageWhere, sql` AND `)} ORDER BY ${orderSql} LIMIT ${limit + 1}`,
   );
   const items = await summariesFor(ctx, list.slice(0, limit));
   let total: number | undefined;
   if (page.withTotal) {
-    const [t] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM events e WHERE ${sql.join(where, sql` AND `)}`);
+    const [t] = await rows<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM events e WHERE ${sql.join(where, sql` AND `)}`,
+    );
     total = t?.n ?? 0;
   }
   const last = list[limit - 1];
   return {
     items,
-    nextCursor: list.length > limit && last ? encodeCursor({ o: iso(last.occurred_at)!, id: last.id }) : null,
+    nextCursor:
+      list.length > limit && last ? encodeCursor({ o: iso(last.occurred_at)!, id: last.id }) : null,
     total,
   };
 }
 
-async function loadVisibleEventRow(ctx: AccessContext, id: string, opts: { includeDeleted?: boolean } = {}) {
+async function loadVisibleEventRow(
+  ctx: AccessContext,
+  id: string,
+  opts: { includeDeleted?: boolean } = {},
+) {
   if (!isUuid(id)) throw new NotFoundError('Event');
   const [row] = await rows<EventRow>(
     sql`SELECT ${EVENT_COLUMNS} ${EVENT_FROM} WHERE e.id = ${id}::uuid AND ${eventVisible(ctx, 'e', opts)}`,
@@ -428,7 +483,11 @@ async function loadVisibleEventRow(ctx: AccessContext, id: string, opts: { inclu
 }
 
 /** True when the Event is visible through a grant that allows adding. */
-async function visibleForAdd(ctx: AccessContext, eventId: string, executor?: Executor): Promise<boolean> {
+async function visibleForAdd(
+  ctx: AccessContext,
+  eventId: string,
+  executor?: Executor,
+): Promise<boolean> {
   const addCtx = restrictContext(ctx, 'add');
   const [row] = await rows<{ ok: boolean }>(
     sql`SELECT EXISTS (SELECT 1 FROM events e WHERE e.id = ${eventId}::uuid AND ${eventVisible(addCtx, 'e')}) AS ok`,
@@ -437,7 +496,10 @@ async function visibleForAdd(ctx: AccessContext, eventId: string, executor?: Exe
   return Boolean(row?.ok);
 }
 
-export async function eventPermissions(ctx: AccessContext, row: { id: string; created_by: string | null; deleted_at: Date | null }): Promise<EventPermissions> {
+export async function eventPermissions(
+  ctx: AccessContext,
+  row: { id: string; created_by: string | null; deleted_at: Date | null },
+): Promise<EventPermissions> {
   if (isOwner(ctx)) {
     const live = row.deleted_at === null;
     return { canEdit: live, canDelete: live, canAddAttachment: live, canOrganise: live };
@@ -467,7 +529,10 @@ async function relatedEvents(ctx: AccessContext, eventId: string): Promise<Relat
     JOIN event_types t ON t.id = e.event_type_id
     WHERE (r.event_a_id = ${eventId}::uuid OR r.event_b_id = ${eventId}::uuid) AND ${eventVisible(ctx, 'e')}
     ORDER BY e.occurred_at`);
-  const links = await actorLinks(ctx, list.map((r) => r.id));
+  const links = await actorLinks(
+    ctx,
+    list.map((r) => r.id),
+  );
   return list.map((r) => ({
     relationId: r.relation_id,
     id: r.id,
@@ -479,7 +544,10 @@ async function relatedEvents(ctx: AccessContext, eventId: string): Promise<Relat
   }));
 }
 
-export async function currentRevision(ctx: AccessContext, eventId: string): Promise<RevisionDTO | null> {
+export async function currentRevision(
+  ctx: AccessContext,
+  eventId: string,
+): Promise<RevisionDTO | null> {
   const list = await revisionsFor(ctx, eventId, { latestOnly: true });
   return list[0] ?? null;
 }
@@ -527,7 +595,9 @@ export async function revisionsFor(
     sha256: r.sha256,
     previousSha256: r.previous_sha256,
     createdAt: iso(r.created_at)!,
-    createdBy: r.created_by ? { id: r.created_by, displayName: r.created_by_name ?? 'Unknown' } : null,
+    createdBy: r.created_by
+      ? { id: r.created_by, displayName: r.created_by_name ?? 'Unknown' }
+      : null,
     createdVia: r.created_via,
     timestamp: timestampFromRow(r),
     // Snapshots can contain Actor names a Helper may not see, so only owners get them.
@@ -535,9 +605,15 @@ export async function revisionsFor(
   }));
 }
 
-export async function getEvent(ctx: AccessContext, id: string, opts: { includeDeleted?: boolean } = {}): Promise<EventDetailDTO> {
+export async function getEvent(
+  ctx: AccessContext,
+  id: string,
+  opts: { includeDeleted?: boolean } = {},
+): Promise<EventDetailDTO> {
   requireScopes(ctx, 'events:read');
-  const row = await loadVisibleEventRow(ctx, id, { includeDeleted: opts.includeDeleted && isOwner(ctx) });
+  const row = await loadVisibleEventRow(ctx, id, {
+    includeDeleted: opts.includeDeleted && isOwner(ctx),
+  });
   const [summary] = await summariesFor(ctx, [row]);
   const canSeeAttachments = !ctx.oauth || ctx.oauth.scopes.has('attachments:metadata');
   const [attachmentRows, related, revision, permissions] = await Promise.all([
@@ -552,7 +628,9 @@ export async function getEvent(ctx: AccessContext, id: string, opts: { includeDe
     revision: row.revision,
     createdAt: iso(row.created_at)!,
     updatedAt: iso(row.updated_at)!,
-    updatedBy: row.updated_by ? { id: row.updated_by, displayName: row.updated_by_name ?? 'Unknown' } : null,
+    updatedBy: row.updated_by
+      ? { id: row.updated_by, displayName: row.updated_by_name ?? 'Unknown' }
+      : null,
     deletedAt: iso(row.deleted_at),
     attachments: attachmentRows.map(toAttachmentDTO),
     related,
@@ -566,10 +644,16 @@ export async function getEvent(ctx: AccessContext, id: string, opts: { includeDe
 // ---------------------------------------------------------------------------
 
 /** Actors an input may link: must exist in the record and be fully accessible. */
-async function resolveLinkableActors(ctx: AccessContext, tx: Executor, actorIds: string[]): Promise<Map<string, string>> {
+async function resolveLinkableActors(
+  ctx: AccessContext,
+  tx: Executor,
+  actorIds: string[],
+): Promise<Map<string, string>> {
   const ids = cleanIds(actorIds);
   if (ids.length !== new Set(actorIds.map((s) => s.toLowerCase())).size) {
-    throw new ValidationError('Unknown Actor', { actors: 'One of the selected Actors could not be found.' });
+    throw new ValidationError('Unknown Actor', {
+      actors: 'One of the selected Actors could not be found.',
+    });
   }
   if (!ids.length) return new Map();
   const found = await rows<{ id: string; merged_into_id: string | null }>(
@@ -577,7 +661,9 @@ async function resolveLinkableActors(ctx: AccessContext, tx: Executor, actorIds:
     tx,
   );
   if (found.length !== ids.length) {
-    throw new ValidationError('Unknown Actor', { actors: 'One of the selected Actors could not be found.' });
+    throw new ValidationError('Unknown Actor', {
+      actors: 'One of the selected Actors could not be found.',
+    });
   }
   // Linking to a merged Actor links to the Actor it was merged into.
   return new Map(found.map((a) => [a.id, a.merged_into_id ?? a.id]));
@@ -592,7 +678,14 @@ async function createInlineActors(
   requireScopes(ctx, 'actors:write');
   const created = await tx
     .insert(actors)
-    .values(list.map((a) => ({ ownerId: ctx.ownerId, name: a.name.trim(), kind: a.kind, createdBy: ctx.userId })))
+    .values(
+      list.map((a) => ({
+        ownerId: ctx.ownerId,
+        name: a.name.trim(),
+        kind: a.kind,
+        createdBy: ctx.userId,
+      })),
+    )
     .returning({ id: actors.id });
   for (const a of created) await auditCtx(ctx, 'actor.created', { type: 'actor', id: a.id }, tx);
   return created.map((c) => c.id);
@@ -608,14 +701,20 @@ async function setEventActors(
   let changed = false;
   for (const row of existing) {
     if (!desiredIds.has(row.actorId)) {
-      await tx.delete(eventActors).where(and(eq(eventActors.eventId, eventId), eq(eventActors.originActorId, row.originActorId)));
+      await tx
+        .delete(eventActors)
+        .where(
+          and(eq(eventActors.eventId, eventId), eq(eventActors.originActorId, row.originActorId)),
+        );
       changed = true;
     }
   }
   for (const [position, d] of desired.entries()) {
     const rowsForActor = existing.filter((r) => r.actorId === d.actorId);
     if (!rowsForActor.length) {
-      await tx.insert(eventActors).values({ eventId, actorId: d.actorId, originActorId: d.actorId, role: d.role, position });
+      await tx
+        .insert(eventActors)
+        .values({ eventId, actorId: d.actorId, originActorId: d.actorId, role: d.role, position });
       changed = true;
     } else {
       for (const r of rowsForActor) {
@@ -623,7 +722,9 @@ async function setEventActors(
           await tx
             .update(eventActors)
             .set({ role: d.role, position })
-            .where(and(eq(eventActors.eventId, eventId), eq(eventActors.originActorId, r.originActorId)));
+            .where(
+              and(eq(eventActors.eventId, eventId), eq(eventActors.originActorId, r.originActorId)),
+            );
           if (r.role !== d.role) changed = true;
         }
       }
@@ -632,7 +733,11 @@ async function setEventActors(
   return changed;
 }
 
-async function assertIncidentsLinkable(ctx: AccessContext, tx: Executor, incidentIds: string[]): Promise<string[]> {
+async function assertIncidentsLinkable(
+  ctx: AccessContext,
+  tx: Executor,
+  incidentIds: string[],
+): Promise<string[]> {
   const ids = cleanIds(incidentIds);
   if (ids.length !== incidentIds.length) throw new ValidationError('Unknown Incident');
   if (!ids.length) return [];
@@ -640,7 +745,10 @@ async function assertIncidentsLinkable(ctx: AccessContext, tx: Executor, inciden
     sql`SELECT i.id FROM incidents i WHERE i.id IN (${uuidList(ids)}) AND ${incidentVisible(restrictContext(ctx, 'add'), 'i')}`,
     tx,
   );
-  if (found.length !== ids.length) throw new ValidationError('Unknown Incident', { incidentIds: 'One of the Incidents could not be found.' });
+  if (found.length !== ids.length)
+    throw new ValidationError('Unknown Incident', {
+      incidentIds: 'One of the Incidents could not be found.',
+    });
   return ids;
 }
 
@@ -657,17 +765,28 @@ export async function createEvent(ctx: AccessContext, rawInput: unknown): Promis
   const type = await resolveEventType(input.typeId);
   if (type.archivedAt) throw new ValidationError('That Event type is archived');
   const occurrence = parseOccurrence(input.occurredAt, ctx.ownerTimezone);
-  if (!occurrence) throw new ValidationError('Invalid date', { occurredAt: 'Enter when this happened, e.g. 2026-09-12 or 2026-09-12T14:30' });
+  if (!occurrence)
+    throw new ValidationError('Invalid date', {
+      occurredAt: 'Enter when this happened, e.g. 2026-09-12 or 2026-09-12T14:30',
+    });
   let endedAt: Date | null = null;
   if (input.endedAt) {
     const end = parseOccurrence(input.endedAt, ctx.ownerTimezone);
-    if (!end) throw new ValidationError('Invalid end date', { endedAt: 'Enter a valid end date and time' });
-    if (end.instant < occurrence.instant) throw new ValidationError('End must be after start', { endedAt: 'The end must be after the start.' });
+    if (!end)
+      throw new ValidationError('Invalid end date', { endedAt: 'Enter a valid end date and time' });
+    if (end.instant < occurrence.instant)
+      throw new ValidationError('End must be after start', {
+        endedAt: 'The end must be after the start.',
+      });
     endedAt = end.instant;
   }
   const amount = normaliseAmount(input.amount);
   const id = await db().transaction(async (tx) => {
-    const actorMap = await resolveLinkableActors(ctx, tx, (input.actors ?? []).map((a) => a.actorId));
+    const actorMap = await resolveLinkableActors(
+      ctx,
+      tx,
+      (input.actors ?? []).map((a) => a.actorId),
+    );
     const newActorIds = await createInlineActors(ctx, tx, input.newActors ?? []);
     const incidentIds = await assertIncidentsLinkable(ctx, tx, input.incidentIds ?? []);
     if (incidentIds.length) requireScopes(ctx, 'incidents:write');
@@ -698,12 +817,18 @@ export async function createEvent(ctx: AccessContext, rawInput: unknown): Promis
     const desired: { actorId: string; role: string | null }[] = [];
     for (const a of input.actors ?? []) {
       const target = actorMap.get(a.actorId.toLowerCase())!;
-      if (!desired.some((d) => d.actorId === target)) desired.push({ actorId: target, role: a.role?.trim() || null });
+      if (!desired.some((d) => d.actorId === target))
+        desired.push({ actorId: target, role: a.role?.trim() || null });
     }
-    (input.newActors ?? []).forEach((a, i) => desired.push({ actorId: newActorIds[i]!, role: a.role?.trim() || null }));
+    (input.newActors ?? []).forEach((a, i) =>
+      desired.push({ actorId: newActorIds[i]!, role: a.role?.trim() || null }),
+    );
     await setEventActors(tx, eventId, desired);
     for (const incidentId of incidentIds) {
-      await tx.insert(incidentEvents).values({ incidentId, eventId, addedBy: ctx.userId }).onConflictDoNothing();
+      await tx
+        .insert(incidentEvents)
+        .values({ incidentId, eventId, addedBy: ctx.userId })
+        .onConflictDoNothing();
     }
     for (const otherId of cleanIds(input.relatedEventIds ?? [])) {
       await linkEventsTx(ctx, tx, eventId, otherId, null);
@@ -739,12 +864,21 @@ async function loadForEdit(ctx: AccessContext, id: string) {
   return row;
 }
 
-export async function updateEvent(ctx: AccessContext, id: string, rawPatch: unknown): Promise<EventDetailDTO> {
+export async function updateEvent(
+  ctx: AccessContext,
+  id: string,
+  rawPatch: unknown,
+): Promise<EventDetailDTO> {
   const row = await loadForEdit(ctx, id);
   const patch = parseInput(eventPatchSchema, rawPatch);
   const changes: Partial<typeof events.$inferInsert> = {};
   const changed: string[] = [];
-  const set = <K extends keyof typeof events.$inferInsert>(key: K, value: (typeof events.$inferInsert)[K], current: unknown, label: string) => {
+  const set = <K extends keyof typeof events.$inferInsert>(
+    key: K,
+    value: (typeof events.$inferInsert)[K],
+    current: unknown,
+    label: string,
+  ) => {
     const a = value instanceof Date ? value.getTime() : JSON.stringify(value ?? null);
     const b = current instanceof Date ? current.getTime() : JSON.stringify(current ?? null);
     if (a !== b) {
@@ -767,37 +901,56 @@ export async function updateEvent(ctx: AccessContext, id: string, rawPatch: unkn
     let end: Date | null = null;
     if (patch.endedAt) {
       const parsed = parseOccurrence(patch.endedAt, ctx.ownerTimezone);
-      if (!parsed) throw new ValidationError('Invalid end date', { endedAt: 'Enter a valid end date and time' });
+      if (!parsed)
+        throw new ValidationError('Invalid end date', {
+          endedAt: 'Enter a valid end date and time',
+        });
       end = parsed.instant;
     }
     set('endedAt', end, row.ended_at, 'endedAt');
   }
   const effectiveStart = (changes.occurredAt as Date | undefined) ?? row.occurred_at;
-  const effectiveEnd = changes.endedAt !== undefined ? (changes.endedAt as Date | null) : row.ended_at;
+  const effectiveEnd =
+    changes.endedAt !== undefined ? (changes.endedAt as Date | null) : row.ended_at;
   if (effectiveEnd && effectiveEnd < effectiveStart) {
-    throw new ValidationError('End must be after start', { endedAt: 'The end must be after the start.' });
+    throw new ValidationError('End must be after start', {
+      endedAt: 'The end must be after the start.',
+    });
   }
-  if (patch.direction !== undefined) set('direction', patch.direction ?? null, row.direction, 'direction');
-  if (patch.description !== undefined) set('description', patch.description.trim(), row.description, 'description');
+  if (patch.direction !== undefined)
+    set('direction', patch.direction ?? null, row.direction, 'direction');
+  if (patch.description !== undefined)
+    set('description', patch.description.trim(), row.description, 'description');
   if (patch.tags !== undefined) set('tags', normaliseTags(patch.tags) ?? [], row.tags, 'tags');
   if (patch.riskLevel !== undefined) set('riskLevel', patch.riskLevel, row.risk_level, 'risk');
   if (patch.riskNote !== undefined) set('riskNote', patch.riskNote ?? null, row.risk_note, 'risk');
-  if (patch.amount !== undefined) set('amount', normaliseAmount(patch.amount) ?? null, row.amount, 'amount');
-  if (patch.currency !== undefined) set('currency', normaliseCurrency(patch.currency) ?? null, row.currency, 'amount');
-  if (patch.reference !== undefined) set('reference', patch.reference ?? null, row.reference, 'reference');
-  if (patch.dueOn !== undefined) set('dueOn', normaliseDue(patch.dueOn) ?? null, row.due_on, 'dueOn');
+  if (patch.amount !== undefined)
+    set('amount', normaliseAmount(patch.amount) ?? null, row.amount, 'amount');
+  if (patch.currency !== undefined)
+    set('currency', normaliseCurrency(patch.currency) ?? null, row.currency, 'amount');
+  if (patch.reference !== undefined)
+    set('reference', patch.reference ?? null, row.reference, 'reference');
+  if (patch.dueOn !== undefined)
+    set('dueOn', normaliseDue(patch.dueOn) ?? null, row.due_on, 'dueOn');
 
   await db().transaction(async (tx) => {
     let actorsChanged = false;
     if (patch.actors !== undefined || patch.newActors !== undefined) {
-      const actorMap = await resolveLinkableActors(ctx, tx, (patch.actors ?? []).map((a) => a.actorId));
+      const actorMap = await resolveLinkableActors(
+        ctx,
+        tx,
+        (patch.actors ?? []).map((a) => a.actorId),
+      );
       const newIds = await createInlineActors(ctx, tx, patch.newActors ?? []);
       const desired: { actorId: string; role: string | null }[] = [];
       for (const a of patch.actors ?? []) {
         const target = actorMap.get(a.actorId.toLowerCase())!;
-        if (!desired.some((d) => d.actorId === target)) desired.push({ actorId: target, role: a.role?.trim() || null });
+        if (!desired.some((d) => d.actorId === target))
+          desired.push({ actorId: target, role: a.role?.trim() || null });
       }
-      (patch.newActors ?? []).forEach((a, i) => desired.push({ actorId: newIds[i]!, role: a.role?.trim() || null }));
+      (patch.newActors ?? []).forEach((a, i) =>
+        desired.push({ actorId: newIds[i]!, role: a.role?.trim() || null }),
+      );
       if (!isOwner(ctx)) {
         // Helpers must not silently remove Actors they cannot see.
         const hidden = await rows<{ actor_id: string }>(
@@ -805,7 +958,9 @@ export async function updateEvent(ctx: AccessContext, id: string, rawPatch: unkn
               WHERE ea.event_id = ${id}::uuid AND NOT ${actorLinkVisible(ctx, 'ea', 'e')}`,
           tx,
         );
-        for (const h of hidden) if (!desired.some((d) => d.actorId === h.actor_id)) desired.push({ actorId: h.actor_id, role: null });
+        for (const h of hidden)
+          if (!desired.some((d) => d.actorId === h.actor_id))
+            desired.push({ actorId: h.actor_id, role: null });
       }
       actorsChanged = await setEventActors(tx, id, desired);
       if (actorsChanged) changed.push('actors');
@@ -824,9 +979,16 @@ export async function updateEvent(ctx: AccessContext, id: string, rawPatch: unkn
       via: ctx.via,
     });
     if (!isOwner(ctx) && !(await visibleForAdd(ctx, id, tx))) {
-      throw new ForbiddenError('This change would move the Event outside the access you have been given');
+      throw new ForbiddenError(
+        'This change would move the Event outside the access you have been given',
+      );
     }
-    await auditCtx(ctx, 'event.updated', { type: 'event', id, metadata: { fields: [...new Set(changed)] } }, tx);
+    await auditCtx(
+      ctx,
+      'event.updated',
+      { type: 'event', id, metadata: { fields: [...new Set(changed)] } },
+      tx,
+    );
   });
   return getEvent(ctx, id);
 }
@@ -840,9 +1002,20 @@ export async function deleteEvent(ctx: AccessContext, id: string): Promise<void>
     const now = new Date();
     await tx
       .update(events)
-      .set({ deletedAt: now, deletedBy: ctx.userId, purgeAfter: new Date(now.getTime() + retentionDays * 86400_000) })
+      .set({
+        deletedAt: now,
+        deletedBy: ctx.userId,
+        purgeAfter: new Date(now.getTime() + retentionDays * 86400_000),
+      })
       .where(eq(events.id, id));
-    await appendRevision(tx, { eventId: id, ownerId: ctx.ownerId, changeKind: 'delete', changedFields: [], userId: ctx.userId, via: ctx.via });
+    await appendRevision(tx, {
+      eventId: id,
+      ownerId: ctx.ownerId,
+      changeKind: 'delete',
+      changedFields: [],
+      userId: ctx.userId,
+      via: ctx.via,
+    });
     await auditCtx(ctx, 'event.deleted', { type: 'event', id, metadata: { retentionDays } }, tx);
   });
 }
@@ -853,8 +1026,18 @@ export async function restoreEvent(ctx: AccessContext, id: string): Promise<Even
   const row = await loadVisibleEventRow(ctx, id, { includeDeleted: true });
   if (!row.deleted_at) return getEvent(ctx, id);
   await db().transaction(async (tx) => {
-    await tx.update(events).set({ deletedAt: null, deletedBy: null, purgeAfter: null }).where(eq(events.id, id));
-    await appendRevision(tx, { eventId: id, ownerId: ctx.ownerId, changeKind: 'restore', changedFields: [], userId: ctx.userId, via: ctx.via });
+    await tx
+      .update(events)
+      .set({ deletedAt: null, deletedBy: null, purgeAfter: null })
+      .where(eq(events.id, id));
+    await appendRevision(tx, {
+      eventId: id,
+      ownerId: ctx.ownerId,
+      changeKind: 'restore',
+      changedFields: [],
+      userId: ctx.userId,
+      via: ctx.via,
+    });
     await auditCtx(ctx, 'event.restored', { type: 'event', id }, tx);
   });
   return getEvent(ctx, id);
@@ -864,7 +1047,13 @@ export async function restoreEvent(ctx: AccessContext, id: string): Promise<Even
 // Event-to-Event relationships
 // ---------------------------------------------------------------------------
 
-async function linkEventsTx(ctx: AccessContext, tx: Executor, aId: string, bId: string, note: string | null) {
+async function linkEventsTx(
+  ctx: AccessContext,
+  tx: Executor,
+  aId: string,
+  bId: string,
+  note: string | null,
+) {
   if (aId === bId) throw new ValidationError('An Event cannot be related to itself');
   const ids = cleanIds([aId, bId]);
   if (ids.length !== 2) throw new NotFoundError('Event');
@@ -876,14 +1065,31 @@ async function linkEventsTx(ctx: AccessContext, tx: Executor, aId: string, bId: 
   const [first, second] = [aId, bId].sort() as [string, string];
   const [rel] = await tx
     .insert(eventRelations)
-    .values({ ownerId: ctx.ownerId, eventAId: first, eventBId: second, note, createdBy: ctx.userId })
+    .values({
+      ownerId: ctx.ownerId,
+      eventAId: first,
+      eventBId: second,
+      note,
+      createdBy: ctx.userId,
+    })
     .onConflictDoNothing()
     .returning({ id: eventRelations.id });
-  if (rel) await auditCtx(ctx, 'event.linked', { type: 'event_relation', id: rel.id, metadata: { events: [first, second] } }, tx);
+  if (rel)
+    await auditCtx(
+      ctx,
+      'event.linked',
+      { type: 'event_relation', id: rel.id, metadata: { events: [first, second] } },
+      tx,
+    );
   return rel?.id ?? null;
 }
 
-export async function linkEvents(ctx: AccessContext, aId: string, bId: string, note?: string | null): Promise<void> {
+export async function linkEvents(
+  ctx: AccessContext,
+  aId: string,
+  bId: string,
+  note?: string | null,
+): Promise<void> {
   requireScopes(ctx, 'events:write');
   if (!isOwner(ctx)) throw new ForbiddenError('Only the owner of this record can relate Events');
   await db().transaction((tx) => linkEventsTx(ctx, tx, aId, bId, note?.trim() || null));
@@ -891,7 +1097,8 @@ export async function linkEvents(ctx: AccessContext, aId: string, bId: string, n
 
 export async function unlinkEvents(ctx: AccessContext, relationId: string): Promise<void> {
   requireScopes(ctx, 'events:write');
-  if (!isOwner(ctx)) throw new ForbiddenError('Only the owner of this record can change related Events');
+  if (!isOwner(ctx))
+    throw new ForbiddenError('Only the owner of this record can change related Events');
   if (!isUuid(relationId)) throw new NotFoundError('Relationship');
   const removed = await db()
     .delete(eventRelations)

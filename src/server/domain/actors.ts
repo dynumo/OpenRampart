@@ -3,9 +3,21 @@ import { z } from 'zod';
 import type { ActorDTO, IncidentRef } from '../../shared/types.js';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
-import { accessGrants, actors, eventActors, grantActors, helperRelationships } from '../db/schema.js';
+import {
+  accessGrants,
+  actors,
+  eventActors,
+  grantActors,
+  helperRelationships,
+} from '../db/schema.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../lib/errors.js';
-import { actorFullAccess, actorLinkVisible, actorVisible, eventVisible, incidentVisible } from './access.js';
+import {
+  actorFullAccess,
+  actorLinkVisible,
+  actorVisible,
+  eventVisible,
+  incidentVisible,
+} from './access.js';
 import { auditCtx } from './audit.js';
 import { appendRevision } from './revisions.js';
 import { isOwner, requireScopes, type AccessContext } from './context.js';
@@ -34,7 +46,8 @@ function parse<T extends z.ZodTypeAny>(schema: T, input: unknown): z.output<T> {
   return r.data;
 }
 
-const blankToNull = (v: string | null | undefined) => (v === undefined ? undefined : v?.trim() ? v.trim() : null);
+const blankToNull = (v: string | null | undefined) =>
+  v === undefined ? undefined : v?.trim() ? v.trim() : null;
 
 interface ActorRow {
   id: string;
@@ -118,7 +131,8 @@ export async function listActors(ctx: AccessContext, query: ActorListQuery = {})
   requireScopes(ctx, 'actors:read');
   const where = [actorVisible(ctx, 'a'), sql`a.merged_into_id IS NULL`];
   if (!query.includeArchived) where.push(sql`a.archived_at IS NULL`);
-  if (query.kind && ['organisation', 'person', 'other'].includes(query.kind)) where.push(sql`a.kind = ${query.kind}`);
+  if (query.kind && ['organisation', 'person', 'other'].includes(query.kind))
+    where.push(sql`a.kind = ${query.kind}`);
   const q = query.q?.trim();
   if (q) {
     where.push(
@@ -127,18 +141,34 @@ export async function listActors(ctx: AccessContext, query: ActorListQuery = {})
   }
   const limit = Math.min(Math.max(query.limit ?? 100, 1), 500);
   const offset = Math.max(query.offset ?? 0, 0);
-  const order = query.sort === 'recent' ? sql`stats.last_event_at DESC NULLS LAST, a.name` : sql`lower(a.name), a.id`;
+  const order =
+    query.sort === 'recent'
+      ? sql`stats.last_event_at DESC NULLS LAST, a.name`
+      : sql`lower(a.name), a.id`;
   const list = await rows<ActorRow>(
     sql`${actorSelect(ctx)} WHERE ${sql.join(where, sql` AND `)} ORDER BY ${order} LIMIT ${limit + 1} OFFSET ${offset}`,
   );
-  const [count] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM actors a WHERE ${sql.join(where, sql` AND `)}`);
-  return { items: list.slice(0, limit).map(toDTO), total: count?.n ?? 0, hasMore: list.length > limit };
+  const [count] = await rows<{ n: number }>(
+    sql`SELECT count(*)::int AS n FROM actors a WHERE ${sql.join(where, sql` AND `)}`,
+  );
+  return {
+    items: list.slice(0, limit).map(toDTO),
+    total: count?.n ?? 0,
+    hasMore: list.length > limit,
+  };
 }
 
-export async function getActor(ctx: AccessContext, id: string): Promise<ActorDTO & { openIncidents: IncidentRef[]; mergedFrom: { id: string; name: string }[] }> {
+export async function getActor(
+  ctx: AccessContext,
+  id: string,
+): Promise<
+  ActorDTO & { openIncidents: IncidentRef[]; mergedFrom: { id: string; name: string }[] }
+> {
   requireScopes(ctx, 'actors:read');
   if (!isUuid(id)) throw new NotFoundError('Actor');
-  const [row] = await rows<ActorRow>(sql`${actorSelect(ctx)} WHERE a.id = ${id}::uuid AND ${actorVisible(ctx, 'a')}`);
+  const [row] = await rows<ActorRow>(
+    sql`${actorSelect(ctx)} WHERE a.id = ${id}::uuid AND ${actorVisible(ctx, 'a')}`,
+  );
   if (!row) throw new NotFoundError('Actor');
   const openIncidents = await rows<IncidentRef>(sql`
     SELECT DISTINCT i.id, i.title, i.status, i.opened_on FROM incidents i
@@ -164,7 +194,11 @@ export async function getActor(ctx: AccessContext, id: string): Promise<ActorDTO
 export async function suggestActors(ctx: AccessContext, q: string, limit = 10) {
   requireScopes(ctx, 'actors:read');
   const term = q.trim();
-  const where = [actorFullAccess(ctx, 'a'), sql`a.merged_into_id IS NULL`, sql`a.archived_at IS NULL`];
+  const where = [
+    actorFullAccess(ctx, 'a'),
+    sql`a.merged_into_id IS NULL`,
+    sql`a.archived_at IS NULL`,
+  ];
   if (term) {
     const like = '%' + term.replace(/[%_\\]/g, '\\$&') + '%';
     where.push(
@@ -212,12 +246,18 @@ export async function createActor(ctx: AccessContext, raw: unknown): Promise<Act
 async function loadActorForWrite(ctx: AccessContext, id: string) {
   requireScopes(ctx, 'actors:write');
   if (!isUuid(id)) throw new NotFoundError('Actor');
-  const [row] = await db().select().from(actors).where(and(eq(actors.id, id), eq(actors.ownerId, ctx.ownerId))).limit(1);
+  const [row] = await db()
+    .select()
+    .from(actors)
+    .where(and(eq(actors.id, id), eq(actors.ownerId, ctx.ownerId)))
+    .limit(1);
   if (!row || row.deletedAt) throw new NotFoundError('Actor');
   if (!isOwner(ctx)) {
     // Helpers may only edit Actors they created themselves.
     if (row.createdBy !== ctx.userId || !ctx.grants.some((g) => g.canAdd)) {
-      const [visible] = await rows<{ ok: boolean }>(sql`SELECT ${actorVisible(ctx, 'a')} AS ok FROM actors a WHERE a.id = ${id}::uuid`);
+      const [visible] = await rows<{ ok: boolean }>(
+        sql`SELECT ${actorVisible(ctx, 'a')} AS ok FROM actors a WHERE a.id = ${id}::uuid`,
+      );
       if (!visible?.ok) throw new NotFoundError('Actor');
       throw new ForbiddenError('Helpers can only edit Actors they added themselves');
     }
@@ -232,20 +272,32 @@ export async function updateActor(ctx: AccessContext, id: string, raw: unknown):
   const set: Partial<typeof actors.$inferInsert> = { updatedAt: new Date() };
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.kind !== undefined) set.kind = patch.kind;
-  if (patch.aliases !== undefined) set.aliases = [...new Set(patch.aliases.map((a) => a.trim()).filter(Boolean))];
+  if (patch.aliases !== undefined)
+    set.aliases = [...new Set(patch.aliases.map((a) => a.trim()).filter(Boolean))];
   if (patch.description !== undefined) set.description = patch.description.trim();
   for (const key of ['accountReference', 'website', 'email', 'phone', 'address'] as const) {
     if (patch[key] !== undefined) set[key] = blankToNull(patch[key]) ?? null;
   }
   await db().update(actors).set(set).where(eq(actors.id, id));
-  await auditCtx(ctx, 'actor.updated', { type: 'actor', id, metadata: { fields: Object.keys(set).filter((k) => k !== 'updatedAt') } });
+  await auditCtx(ctx, 'actor.updated', {
+    type: 'actor',
+    id,
+    metadata: { fields: Object.keys(set).filter((k) => k !== 'updatedAt') },
+  });
   return getActor(ctx, id);
 }
 
-export async function setActorArchived(ctx: AccessContext, id: string, archived: boolean): Promise<ActorDTO> {
+export async function setActorArchived(
+  ctx: AccessContext,
+  id: string,
+  archived: boolean,
+): Promise<ActorDTO> {
   if (!isOwner(ctx)) throw new ForbiddenError('Only the owner of this record can archive Actors');
   await loadActorForWrite(ctx, id);
-  await db().update(actors).set({ archivedAt: archived ? new Date() : null, updatedAt: new Date() }).where(eq(actors.id, id));
+  await db()
+    .update(actors)
+    .set({ archivedAt: archived ? new Date() : null, updatedAt: new Date() })
+    .where(eq(actors.id, id));
   await auditCtx(ctx, 'actor.archived', { type: 'actor', id, metadata: { archived } });
   return getActor(ctx, id);
 }
@@ -268,16 +320,27 @@ export async function deleteActor(ctx: AccessContext, id: string): Promise<void>
   const now = new Date();
   await db()
     .update(actors)
-    .set({ deletedAt: now, deletedBy: ctx.userId, purgeAfter: new Date(now.getTime() + config().DELETION_RETENTION_DAYS * 86400_000) })
+    .set({
+      deletedAt: now,
+      deletedBy: ctx.userId,
+      purgeAfter: new Date(now.getTime() + config().DELETION_RETENTION_DAYS * 86400_000),
+    })
     .where(eq(actors.id, id));
   await auditCtx(ctx, 'actor.deleted', { type: 'actor', id });
 }
 
 export async function restoreActor(ctx: AccessContext, id: string): Promise<ActorDTO> {
   if (!isOwner(ctx)) throw new ForbiddenError();
-  const [row] = await db().select().from(actors).where(and(eq(actors.id, id), eq(actors.ownerId, ctx.ownerId))).limit(1);
+  const [row] = await db()
+    .select()
+    .from(actors)
+    .where(and(eq(actors.id, id), eq(actors.ownerId, ctx.ownerId)))
+    .limit(1);
   if (!row) throw new NotFoundError('Actor');
-  await db().update(actors).set({ deletedAt: null, deletedBy: null, purgeAfter: null }).where(eq(actors.id, id));
+  await db()
+    .update(actors)
+    .set({ deletedAt: null, deletedBy: null, purgeAfter: null })
+    .where(eq(actors.id, id));
   await auditCtx(ctx, 'actor.restored', { type: 'actor', id });
   return getActor(ctx, id);
 }
@@ -285,32 +348,53 @@ export async function restoreActor(ctx: AccessContext, id: string): Promise<Acto
 export interface MergePreview {
   target: { id: string; name: string };
   sources: { id: string; name: string; eventCount: number }[];
-  affectedHelpers: { relationshipId: string; label: string; grantId: string; actorsInGrant: string[] }[];
+  affectedHelpers: {
+    relationshipId: string;
+    label: string;
+    grantId: string;
+    actorsInGrant: string[];
+  }[];
 }
 
 async function loadMergeActors(ctx: AccessContext, targetId: string, sourceIds: string[]) {
   if (!isOwner(ctx)) throw new ForbiddenError('Only the owner of this record can merge Actors');
   requireScopes(ctx, 'actors:write');
   const sources = cleanIds(sourceIds).filter((s) => s !== targetId);
-  if (!isUuid(targetId) || !sources.length) throw new ValidationError('Choose at least one Actor to merge into the target');
+  if (!isUuid(targetId) || !sources.length)
+    throw new ValidationError('Choose at least one Actor to merge into the target');
   const all = await db()
     .select()
     .from(actors)
     .where(and(eq(actors.ownerId, ctx.ownerId), inArray(actors.id, [targetId, ...sources])));
   const target = all.find((a) => a.id === targetId);
   const src = all.filter((a) => sources.includes(a.id));
-  if (!target || target.deletedAt || target.mergedIntoId || src.length !== sources.length || src.some((s) => s.deletedAt || s.mergedIntoId)) {
+  if (
+    !target ||
+    target.deletedAt ||
+    target.mergedIntoId ||
+    src.length !== sources.length ||
+    src.some((s) => s.deletedAt || s.mergedIntoId)
+  ) {
     throw new NotFoundError('Actor');
   }
   return { target, sources: src };
 }
 
-export async function previewMerge(ctx: AccessContext, targetId: string, sourceIds: string[]): Promise<MergePreview> {
+export async function previewMerge(
+  ctx: AccessContext,
+  targetId: string,
+  sourceIds: string[],
+): Promise<MergePreview> {
   const { target, sources } = await loadMergeActors(ctx, targetId, sourceIds);
   const counts = await rows<{ actor_id: string; n: number }>(
     sql`SELECT actor_id, count(DISTINCT event_id)::int AS n FROM event_actors WHERE actor_id IN (${uuidList(sources.map((s) => s.id))}) GROUP BY actor_id`,
   );
-  const affected = await rows<{ relationship_id: string; label: string; grant_id: string; actor_id: string }>(sql`
+  const affected = await rows<{
+    relationship_id: string;
+    label: string;
+    grant_id: string;
+    actor_id: string;
+  }>(sql`
     SELECT r.id AS relationship_id, r.label, g.id AS grant_id, ga.actor_id
     FROM grant_actors ga
     JOIN access_grants g ON g.id = ga.grant_id AND g.revoked_at IS NULL
@@ -318,13 +402,22 @@ export async function previewMerge(ctx: AccessContext, targetId: string, sourceI
     WHERE g.owner_id = ${ctx.ownerId} AND ga.actor_id IN (${uuidList([target.id, ...sources.map((s) => s.id)])})`);
   const byGrant = new Map<string, MergePreview['affectedHelpers'][number]>();
   for (const a of affected) {
-    const entry = byGrant.get(a.grant_id) ?? { relationshipId: a.relationship_id, label: a.label, grantId: a.grant_id, actorsInGrant: [] };
+    const entry = byGrant.get(a.grant_id) ?? {
+      relationshipId: a.relationship_id,
+      label: a.label,
+      grantId: a.grant_id,
+      actorsInGrant: [],
+    };
     entry.actorsInGrant.push(a.actor_id);
     byGrant.set(a.grant_id, entry);
   }
   return {
     target: { id: target.id, name: target.name },
-    sources: sources.map((s) => ({ id: s.id, name: s.name, eventCount: counts.find((c) => c.actor_id === s.id)?.n ?? 0 })),
+    sources: sources.map((s) => ({
+      id: s.id,
+      name: s.name,
+      eventCount: counts.find((c) => c.actor_id === s.id)?.n ?? 0,
+    })),
     affectedHelpers: [...byGrant.values()],
   };
 }
@@ -366,8 +459,13 @@ export async function mergeActors(
       .update(actors)
       .set({
         aliases: [...aliases],
-        description: [target.description, ...sources.map((s) => s.description)].filter((d) => d.trim()).join('\n\n'),
-        accountReference: target.accountReference ?? sources.find((s) => s.accountReference)?.accountReference ?? null,
+        description: [target.description, ...sources.map((s) => s.description)]
+          .filter((d) => d.trim())
+          .join('\n\n'),
+        accountReference:
+          target.accountReference ??
+          sources.find((s) => s.accountReference)?.accountReference ??
+          null,
         website: target.website ?? sources.find((s) => s.website)?.website ?? null,
         email: target.email ?? sources.find((s) => s.email)?.email ?? null,
         phone: target.phone ?? sources.find((s) => s.phone)?.phone ?? null,
@@ -380,7 +478,10 @@ export async function mergeActors(
       .set({ mergedIntoId: target.id, mergedAt: now, archivedAt: now, updatedAt: now })
       .where(inArray(actors.id, sourceIdList));
     // Earlier merges into a source now point at the final target.
-    await tx.update(actors).set({ mergedIntoId: target.id }).where(inArray(actors.mergedIntoId, sourceIdList));
+    await tx
+      .update(actors)
+      .set({ mergedIntoId: target.id })
+      .where(inArray(actors.mergedIntoId, sourceIdList));
 
     // Each affected Event's Actor list changed, so each gets a new revision.
     for (const eventId of [...new Set(moved.map((m) => m.eventId))]) {
@@ -405,10 +506,22 @@ export async function mergeActors(
         .where(and(inArray(grantActors.actorId, allIds), eq(accessGrants.ownerId, ctx.ownerId)));
       for (const g of grants) {
         for (const actorId of allIds) {
-          await tx.insert(grantActors).values({ grantId: g.grantId, actorId }).onConflictDoNothing();
+          await tx
+            .insert(grantActors)
+            .values({ grantId: g.grantId, actorId })
+            .onConflictDoNothing();
         }
         extended.push(g.grantId);
-        await auditCtx(ctx, 'grant.updated', { type: 'grant', id: g.grantId, metadata: { reason: 'actor_merge', addedActors: allIds } }, tx);
+        await auditCtx(
+          ctx,
+          'grant.updated',
+          {
+            type: 'grant',
+            id: g.grantId,
+            metadata: { reason: 'actor_merge', addedActors: allIds },
+          },
+          tx,
+        );
       }
     }
     await auditCtx(

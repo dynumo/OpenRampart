@@ -13,7 +13,10 @@ import { createHash, randomBytes } from 'node:crypto';
  * Only digests (hashes) are ever sent to calendar servers — never documents.
  */
 
-export const HEADER_MAGIC = Buffer.from('004f70656e54696d657374616d7073000050726f6f6600bf89e2e884e89294', 'hex');
+export const HEADER_MAGIC = Buffer.from(
+  '004f70656e54696d657374616d7073000050726f6f6600bf89e2e884e89294',
+  'hex',
+);
 export const MAJOR_VERSION = 1;
 
 const TAG_PENDING = Buffer.from('83dfe30d2ef90c8e', 'hex');
@@ -176,7 +179,10 @@ function compareOps(a: Op, b: Op): number {
   const ta = OP_TAGS[a.kind];
   const tb = OP_TAGS[b.kind];
   if (ta !== tb) return ta - tb;
-  if ((a.kind === 'append' || a.kind === 'prepend') && (b.kind === 'append' || b.kind === 'prepend')) {
+  if (
+    (a.kind === 'append' || a.kind === 'prepend') &&
+    (b.kind === 'append' || b.kind === 'prepend')
+  ) {
     return Buffer.compare(a.arg, b.arg);
   }
   return 0;
@@ -197,7 +203,8 @@ function readAttestation(r: Reader): Attestation {
   const pr = new Reader(payload);
   if (tag.equals(TAG_PENDING)) {
     const uri = pr.varbytes(1000).toString('utf8');
-    if (!/^[A-Za-z0-9.\-_/:]+$/.test(uri)) throw new OtsError('Invalid calendar URI in pending attestation');
+    if (!/^[A-Za-z0-9.\-_/:]+$/.test(uri))
+      throw new OtsError('Invalid calendar URI in pending attestation');
     return { kind: 'pending', uri };
   }
   if (tag.equals(TAG_BITCOIN)) return { kind: 'bitcoin', height: pr.varuint() };
@@ -229,13 +236,18 @@ function compareAttestations(a: Attestation, b: Attestation): number {
     if (t !== 0 || a.kind !== 'unknown' || b.kind !== 'unknown') return t;
     return Buffer.compare(a.payload, b.payload);
   }
-  if (a.kind === 'pending' && b.kind === 'pending') return a.uri < b.uri ? -1 : a.uri > b.uri ? 1 : 0;
+  if (a.kind === 'pending' && b.kind === 'pending')
+    return a.uri < b.uri ? -1 : a.uri > b.uri ? 1 : 0;
   if (a.kind === 'bitcoin' && b.kind === 'bitcoin') return a.height - b.height;
   return 0;
 }
 
 function attestationKey(a: Attestation): string {
-  return a.kind === 'pending' ? `p:${a.uri}` : a.kind === 'bitcoin' ? `b:${a.height}` : `u:${a.tag.toString('hex')}:${a.payload.toString('hex')}`;
+  return a.kind === 'pending'
+    ? `p:${a.uri}`
+    : a.kind === 'bitcoin'
+      ? `b:${a.height}`
+      : `u:${a.tag.toString('hex')}:${a.payload.toString('hex')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,11 +273,13 @@ export class Timestamp {
   }
 
   addAttestation(a: Attestation): void {
-    if (!this.attestations.some((x) => attestationKey(x) === attestationKey(a))) this.attestations.push(a);
+    if (!this.attestations.some((x) => attestationKey(x) === attestationKey(a)))
+      this.attestations.push(a);
   }
 
   merge(other: Timestamp): void {
-    if (!other.msg.equals(this.msg)) throw new OtsError('Cannot merge timestamps for different messages');
+    if (!other.msg.equals(this.msg))
+      throw new OtsError('Cannot merge timestamps for different messages');
     for (const a of other.attestations) this.addAttestation(a);
     for (const { op, stamp } of other.ops.values()) this.add(op).merge(stamp);
   }
@@ -364,7 +378,8 @@ export interface DetachedTimestamp {
 
 export function parseOtsFile(buf: Buffer): DetachedTimestamp {
   const r = new Reader(buf);
-  if (!r.bytes(HEADER_MAGIC.length).equals(HEADER_MAGIC)) throw new OtsError('Not an OpenTimestamps proof file');
+  if (!r.bytes(HEADER_MAGIC.length).equals(HEADER_MAGIC))
+    throw new OtsError('Not an OpenTimestamps proof file');
   const version = r.varuint();
   if (version !== MAJOR_VERSION) throw new OtsError(`Unsupported proof version ${version}`);
   const hashTag = r.byte();
@@ -398,7 +413,9 @@ export function serializeOtsFile(d: DetachedTimestamp): Buffer {
 export function buildMerkleBatch(digests: Buffer[]): { leaves: Timestamp[]; root: Timestamp } {
   if (!digests.length) throw new OtsError('Nothing to timestamp');
   const leaves = digests.map((d) => new Timestamp(Buffer.from(d)));
-  let level = leaves.map((t) => t.add({ kind: 'append', arg: randomBytes(16) }).add({ kind: 'sha256' }));
+  let level = leaves.map((t) =>
+    t.add({ kind: 'append', arg: randomBytes(16) }).add({ kind: 'sha256' }),
+  );
   while (level.length > 1) {
     const next: Timestamp[] = [];
     for (let i = 0; i + 1 < level.length; i += 2) {
@@ -406,7 +423,10 @@ export function buildMerkleBatch(digests: Buffer[]): { leaves: Timestamp[]; root
       const right = level[i + 1]!;
       const joined = left.add({ kind: 'append', arg: right.msg });
       // The right branch prepends the left message and reaches the same node.
-      right.ops.set(opKey({ kind: 'prepend', arg: left.msg }), { op: { kind: 'prepend', arg: left.msg }, stamp: joined });
+      right.ops.set(opKey({ kind: 'prepend', arg: left.msg }), {
+        op: { kind: 'prepend', arg: left.msg },
+        stamp: joined,
+      });
       next.push(joined.add({ kind: 'sha256' }));
     }
     if (level.length % 2 === 1) next.push(level[level.length - 1]!);
@@ -432,10 +452,18 @@ async function readLimited(res: Response, limit = 10_000): Promise<Buffer> {
   return buf;
 }
 
-export async function submitToCalendar(calendarUrl: string, digest: Buffer, opts: CalendarClientOptions = {}): Promise<Timestamp> {
+export async function submitToCalendar(
+  calendarUrl: string,
+  digest: Buffer,
+  opts: CalendarClientOptions = {},
+): Promise<Timestamp> {
   const res = await (opts.fetchImpl ?? fetch)(`${calendarUrl.replace(/\/+$/, '')}/digest`, {
     method: 'POST',
-    headers: { Accept: ACCEPT, 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'OpenRampart' },
+    headers: {
+      Accept: ACCEPT,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'OpenRampart',
+    },
     body: new Uint8Array(digest),
     signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
   });
@@ -444,11 +472,18 @@ export async function submitToCalendar(calendarUrl: string, digest: Buffer, opts
 }
 
 /** Ask a calendar for the completed timestamp of a commitment. Returns null while still pending. */
-export async function fetchFromCalendar(calendarUrl: string, commitment: Buffer, opts: CalendarClientOptions = {}): Promise<Timestamp | null> {
-  const res = await (opts.fetchImpl ?? fetch)(`${calendarUrl.replace(/\/+$/, '')}/timestamp/${commitment.toString('hex')}`, {
-    headers: { Accept: ACCEPT, 'User-Agent': 'OpenRampart' },
-    signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
-  });
+export async function fetchFromCalendar(
+  calendarUrl: string,
+  commitment: Buffer,
+  opts: CalendarClientOptions = {},
+): Promise<Timestamp | null> {
+  const res = await (opts.fetchImpl ?? fetch)(
+    `${calendarUrl.replace(/\/+$/, '')}/timestamp/${commitment.toString('hex')}`,
+    {
+      headers: { Accept: ACCEPT, 'User-Agent': 'OpenRampart' },
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
+    },
+  );
   if (res.status === 404) return null;
   if (res.status !== 200) throw new OtsError(`Calendar ${calendarUrl} returned HTTP ${res.status}`);
   return Timestamp.fromBytes(await readLimited(res), commitment);
@@ -502,13 +537,21 @@ export type BlockLookup = (height: number) => Promise<BlockHeaderInfo>;
 export function esploraLookup(baseUrl: string, fetchImpl: typeof fetch = fetch): BlockLookup {
   const base = baseUrl.replace(/\/+$/, '');
   return async (height) => {
-    const hashRes = await fetchImpl(`${base}/block-height/${height}`, { signal: AbortSignal.timeout(15_000) });
+    const hashRes = await fetchImpl(`${base}/block-height/${height}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!hashRes.ok) throw new OtsError(`Block explorer returned HTTP ${hashRes.status}`);
     const hash = (await hashRes.text()).trim();
     if (!/^[0-9a-f]{64}$/.test(hash)) throw new OtsError('Unexpected block hash from explorer');
-    const blockRes = await fetchImpl(`${base}/block/${hash}`, { signal: AbortSignal.timeout(15_000) });
+    const blockRes = await fetchImpl(`${base}/block/${hash}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!blockRes.ok) throw new OtsError(`Block explorer returned HTTP ${blockRes.status}`);
-    const block = (await blockRes.json()) as { height: number; merkle_root: string; timestamp: number };
+    const block = (await blockRes.json()) as {
+      height: number;
+      merkle_root: string;
+      timestamp: number;
+    };
     return { height: block.height, merkleRootHex: block.merkle_root, time: block.timestamp };
   };
 }
@@ -527,11 +570,19 @@ export interface VerificationResult {
  * existed no later than that block's time. It says nothing about whether the
  * document's contents are true.
  */
-export async function verifyTimestamp(timestamp: Timestamp, lookup: BlockLookup): Promise<VerificationResult> {
+export async function verifyTimestamp(
+  timestamp: Timestamp,
+  lookup: BlockLookup,
+): Promise<VerificationResult> {
   const atts = timestamp.allAttestations();
-  const pendingCalendars = atts.flatMap((a) => (a.attestation.kind === 'pending' ? [a.attestation.uri] : []));
+  const pendingCalendars = atts.flatMap((a) =>
+    a.attestation.kind === 'pending' ? [a.attestation.uri] : [],
+  );
   const bitcoin = atts
-    .filter((a): a is { msg: Buffer; attestation: { kind: 'bitcoin'; height: number } } => a.attestation.kind === 'bitcoin')
+    .filter(
+      (a): a is { msg: Buffer; attestation: { kind: 'bitcoin'; height: number } } =>
+        a.attestation.kind === 'bitcoin',
+    )
     .sort((a, b) => a.attestation.height - b.attestation.height);
   if (!bitcoin.length) return { verified: false, pendingCalendars, reason: 'pending' };
   let lastError = 'no matching block';
@@ -544,7 +595,12 @@ export async function verifyTimestamp(timestamp: Timestamp, lookup: BlockLookup)
       const header = await lookup(attestation.height);
       const expected = Buffer.from(header.merkleRootHex, 'hex').reverse();
       if (expected.equals(msg)) {
-        return { verified: true, height: attestation.height, attestedTime: new Date(header.time * 1000), pendingCalendars };
+        return {
+          verified: true,
+          height: attestation.height,
+          attestedTime: new Date(header.time * 1000),
+          pendingCalendars,
+        };
       }
       lastError = `Merkle root does not match block ${attestation.height}`;
     } catch (err) {

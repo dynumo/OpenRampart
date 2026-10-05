@@ -52,11 +52,18 @@ function ok(data: unknown): CallToolResult {
 
 function fail(err: unknown): CallToolResult {
   if (err instanceof AppError) {
-    const details = err.details?.fields ? ` (${Object.entries(err.details.fields as Record<string, string>).map(([k, v]) => `${k}: ${v}`).join('; ')})` : '';
+    const details = err.details?.fields
+      ? ` (${Object.entries(err.details.fields as Record<string, string>)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('; ')})`
+      : '';
     return { isError: true, content: [{ type: 'text', text: `${err.message}${details}` }] };
   }
   logger.error({ err: (err as Error).message }, 'MCP tool failed');
-  return { isError: true, content: [{ type: 'text', text: 'The request could not be completed.' }] };
+  return {
+    isError: true,
+    content: [{ type: 'text', text: 'The request could not be completed.' }],
+  };
 }
 
 type ToolContext = { ctx: AccessContext };
@@ -67,7 +74,10 @@ function contextFrom(authInfo: AuthInfo | undefined): AccessContext {
   return ctx;
 }
 
-const dateish = z.string().max(40).describe('YYYY-MM-DD, YYYY-MM-DDTHH:mm (record time zone) or ISO 8601');
+const dateish = z
+  .string()
+  .max(40)
+  .describe('YYYY-MM-DD, YYYY-MM-DDTHH:mm (record time zone) or ISO 8601');
 const uuid = z.string().uuid();
 const pageArgs = {
   limit: z.number().int().min(1).max(200).optional().describe('Maximum results (default 50)'),
@@ -75,7 +85,10 @@ const pageArgs = {
 };
 
 function buildServer(authInfo: AuthInfo | undefined): McpServer {
-  const server = new McpServer(SERVER_INFO, { capabilities: { tools: {} }, instructions: INSTRUCTIONS });
+  const server = new McpServer(SERVER_INFO, {
+    capabilities: { tools: {} },
+    instructions: INSTRUCTIONS,
+  });
 
   const tool = <S extends z.ZodObject>(
     name: string,
@@ -90,7 +103,12 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
       {
         description,
         inputSchema: schema,
-        annotations: { readOnlyHint: readOnly, destructiveHint: false, idempotentHint: readOnly, openWorldHint: false },
+        annotations: {
+          readOnlyHint: readOnly,
+          destructiveHint: false,
+          idempotentHint: readOnly,
+          openWorldHint: false,
+        },
         scopeChallenge: challenge(...scopes),
       },
       (async (args: z.output<S>) => {
@@ -116,41 +134,93 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
       query: z.string().max(300).optional(),
       actorIds: z.array(uuid).max(50).optional(),
       incidentIds: z.array(uuid).max(50).optional(),
-      eventTypes: z.array(z.string().max(64)).max(50).optional().describe('Event type keys (see list_event_types) or ids'),
-      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      eventTypes: z
+        .array(z.string().max(64))
+        .max(50)
+        .optional()
+        .describe('Event type keys (see list_event_types) or ids'),
+      from: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+      to: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
       riskLevels: z.array(z.enum(['none', 'low', 'medium', 'high'])).optional(),
       ...pageArgs,
     }),
     async (a, { ctx }) => {
-      const types = a.eventTypes?.length ? (await allEventTypes()).filter((t) => a.eventTypes!.includes(t.key) || a.eventTypes!.includes(t.id)).map((t) => t.id) : undefined;
-      const filters = { actorIds: a.actorIds, incidentIds: a.incidentIds, typeIds: types ?? (a.eventTypes?.length ? ['00000000-0000-0000-0000-000000000000'] : undefined), from: a.from, to: a.to, riskLevels: a.riskLevels };
+      const types = a.eventTypes?.length
+        ? (await allEventTypes())
+            .filter((t) => a.eventTypes!.includes(t.key) || a.eventTypes!.includes(t.id))
+            .map((t) => t.id)
+        : undefined;
+      const filters = {
+        actorIds: a.actorIds,
+        incidentIds: a.incidentIds,
+        typeIds:
+          types ?? (a.eventTypes?.length ? ['00000000-0000-0000-0000-000000000000'] : undefined),
+        from: a.from,
+        to: a.to,
+        riskLevels: a.riskLevels,
+      };
       if (a.query?.trim()) {
-        const r = await searchSvc.search(ctx, a.query, { include: ['events'], limit: a.limit ?? 25, filters });
-        return { query: r.query, correctedQuery: r.correctedQuery, total: r.totals.events, events: r.events };
+        const r = await searchSvc.search(ctx, a.query, {
+          include: ['events'],
+          limit: a.limit ?? 25,
+          filters,
+        });
+        return {
+          query: r.query,
+          correctedQuery: r.correctedQuery,
+          total: r.totals.events,
+          events: r.events,
+        };
       }
-      return eventsSvc.listEvents(ctx, filters, { limit: a.limit, cursor: a.cursor, withTotal: true });
+      return eventsSvc.listEvents(ctx, filters, {
+        limit: a.limit,
+        cursor: a.cursor,
+        withTotal: true,
+      });
     },
   );
 
-  tool('get_event', 'Get one Event with its Actors, Incidents, related Events, attachment metadata and integrity information.', ['events:read'], z.object({ eventId: uuid }), async (a, { ctx }) =>
-    eventsSvc.getEvent(ctx, a.eventId),
+  tool(
+    'get_event',
+    'Get one Event with its Actors, Incidents, related Events, attachment metadata and integrity information.',
+    ['events:read'],
+    z.object({ eventId: uuid }),
+    async (a, { ctx }) => eventsSvc.getEvent(ctx, a.eventId),
   );
 
-  tool('list_event_types', 'List the available Event types.', ['events:read'], z.object({}), async () =>
-    (await allEventTypes()).filter((t) => !t.archivedAt).map(toEventTypeDTO),
+  tool(
+    'list_event_types',
+    'List the available Event types.',
+    ['events:read'],
+    z.object({}),
+    async () => (await allEventTypes()).filter((t) => !t.archivedAt).map(toEventTypeDTO),
   );
 
   tool(
     'list_actors',
     'List or find Actors (organisations and people) in the record.',
     ['actors:read'],
-    z.object({ query: z.string().max(200).optional(), includeArchived: z.boolean().optional(), limit: z.number().int().min(1).max(500).optional() }),
-    async (a, { ctx }) => actorsSvc.listActors(ctx, { q: a.query, includeArchived: a.includeArchived, limit: a.limit }),
+    z.object({
+      query: z.string().max(200).optional(),
+      includeArchived: z.boolean().optional(),
+      limit: z.number().int().min(1).max(500).optional(),
+    }),
+    async (a, { ctx }) =>
+      actorsSvc.listActors(ctx, { q: a.query, includeArchived: a.includeArchived, limit: a.limit }),
   );
 
-  tool('get_actor', 'Get an Actor with summary information (event counts, most recent interaction, open Incidents).', ['actors:read'], z.object({ actorId: uuid }), async (a, { ctx }) =>
-    actorsSvc.getActor(ctx, a.actorId),
+  tool(
+    'get_actor',
+    'Get an Actor with summary information (event counts, most recent interaction, open Incidents).',
+    ['actors:read'],
+    z.object({ actorId: uuid }),
+    async (a, { ctx }) => actorsSvc.getActor(ctx, a.actorId),
   );
 
   tool(
@@ -160,24 +230,48 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     z.object({
       actorId: uuid,
       order: z.enum(['asc', 'desc']).optional(),
-      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      from: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+      to: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
       incidentIds: z.array(uuid).optional(),
       ...pageArgs,
     }),
     async (a, { ctx }) => {
       const actor = await actorsSvc.getActor(ctx, a.actorId);
-      const timeline = await eventsSvc.listEvents(ctx, { actorIds: [a.actorId], from: a.from, to: a.to, incidentIds: a.incidentIds }, { order: a.order ?? 'desc', limit: a.limit, cursor: a.cursor, withTotal: true });
-      return { actor: { id: actor.id, name: actor.name, kind: actor.kind, stats: actor.stats }, ...timeline };
+      const timeline = await eventsSvc.listEvents(
+        ctx,
+        { actorIds: [a.actorId], from: a.from, to: a.to, incidentIds: a.incidentIds },
+        { order: a.order ?? 'desc', limit: a.limit, cursor: a.cursor, withTotal: true },
+      );
+      return {
+        actor: { id: actor.id, name: actor.name, kind: actor.kind, stats: actor.stats },
+        ...timeline,
+      };
     },
   );
 
-  tool('list_incidents', 'List Incidents, optionally filtered by status or title.', ['incidents:read'], z.object({ status: z.array(z.enum(['open', 'monitoring', 'resolved', 'closed'])).optional(), query: z.string().max(200).optional() }), async (a, { ctx }) =>
-    incidentsSvc.listIncidents(ctx, { status: a.status, search: a.query }),
+  tool(
+    'list_incidents',
+    'List Incidents, optionally filtered by status or title.',
+    ['incidents:read'],
+    z.object({
+      status: z.array(z.enum(['open', 'monitoring', 'resolved', 'closed'])).optional(),
+      query: z.string().max(200).optional(),
+    }),
+    async (a, { ctx }) => incidentsSvc.listIncidents(ctx, { status: a.status, search: a.query }),
   );
 
-  tool('get_incident', 'Get an Incident (title, status, dates, impact and outcome notes).', ['incidents:read'], z.object({ incidentId: uuid }), async (a, { ctx }) =>
-    incidentsSvc.getIncident(ctx, a.incidentId),
+  tool(
+    'get_incident',
+    'Get an Incident (title, status, dates, impact and outcome notes).',
+    ['incidents:read'],
+    z.object({ incidentId: uuid }),
+    async (a, { ctx }) => incidentsSvc.getIncident(ctx, a.incidentId),
   );
 
   tool(
@@ -187,7 +281,11 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     z.object({ incidentId: uuid, order: z.enum(['asc', 'desc']).optional(), ...pageArgs }),
     async (a, { ctx }) => {
       const incident = await incidentsSvc.getIncident(ctx, a.incidentId);
-      const timeline = await eventsSvc.listEvents(ctx, { incidentIds: [a.incidentId] }, { order: a.order ?? 'asc', limit: a.limit, cursor: a.cursor, withTotal: true });
+      const timeline = await eventsSvc.listEvents(
+        ctx,
+        { incidentIds: [a.incidentId] },
+        { order: a.order ?? 'asc', limit: a.limit, cursor: a.cursor, withTotal: true },
+      );
       return { incident, ...timeline };
     },
   );
@@ -196,19 +294,33 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     'search_documents',
     'Search attachments. With attachments:read this searches OCR text and returns snippets; with only attachments:metadata it matches file names and returns no text.',
     ['search:read', 'attachments:metadata'],
-    z.object({ query: z.string().min(1).max(300), limit: z.number().int().min(1).max(100).optional() }),
+    z.object({
+      query: z.string().min(1).max(300),
+      limit: z.number().int().min(1).max(100).optional(),
+    }),
     async (a, { ctx }) => searchSvc.searchDocuments(ctx, a.query, { limit: a.limit }),
   );
 
-  tool('get_attachment_metadata', 'Get attachment metadata: file name, type, size, SHA-256, OCR status and timestamp status. Does not include contents.', ['attachments:metadata'], z.object({ attachmentId: uuid }), async (a, { ctx }) =>
-    attachmentsSvc.getAttachment(ctx, a.attachmentId),
+  tool(
+    'get_attachment_metadata',
+    'Get attachment metadata: file name, type, size, SHA-256, OCR status and timestamp status. Does not include contents.',
+    ['attachments:metadata'],
+    z.object({ attachmentId: uuid }),
+    async (a, { ctx }) => attachmentsSvc.getAttachment(ctx, a.attachmentId),
   );
 
   server.registerTool(
     'get_attachment',
     {
-      description: 'Get an attachment\'s contents: its OCR/extracted text and, for files up to 8 MB, the original file. Requires attachments:read.',
-      inputSchema: z.object({ attachmentId: uuid, includeFile: z.boolean().optional().describe('Also return the original file (default true)') }),
+      description:
+        "Get an attachment's contents: its OCR/extracted text and, for files up to 8 MB, the original file. Requires attachments:read.",
+      inputSchema: z.object({
+        attachmentId: uuid,
+        includeFile: z
+          .boolean()
+          .optional()
+          .describe('Also return the original file (default true)'),
+      }),
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       scopeChallenge: challenge('attachments:read'),
     },
@@ -218,11 +330,29 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
         const meta = await attachmentsSvc.getAttachment(ctx, a.attachmentId);
         const text = await attachmentsSvc.getAttachmentText(ctx, a.attachmentId);
         const content: CallToolResult['content'] = [
-          { type: 'text', text: JSON.stringify({ metadata: meta, ocr: { status: text.status, engine: text.engine, corrected: text.corrected, text: text.text } }, null, 2) },
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                metadata: meta,
+                ocr: {
+                  status: text.status,
+                  engine: text.engine,
+                  corrected: text.corrected,
+                  text: text.text,
+                },
+              },
+              null,
+              2,
+            ),
+          },
         ];
         if (a.includeFile !== false) {
           if (meta.sizeBytes > MAX_INLINE_FILE_BYTES) {
-            content.push({ type: 'text', text: `The original file is ${Math.round(meta.sizeBytes / 1048576)} MB, too large to return here. Download it from OpenRampart.` });
+            content.push({
+              type: 'text',
+              text: `The original file is ${Math.round(meta.sizeBytes / 1048576)} MB, too large to return here. Download it from OpenRampart.`,
+            });
           } else {
             const file = await attachmentsSvc.openAttachment(ctx, a.attachmentId, 'original');
             const chunks: Buffer[] = [];
@@ -230,7 +360,11 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
             const blob = Buffer.concat(chunks);
             content.push({
               type: 'resource',
-              resource: { uri: `${config().APP_URL}/api/attachments/${a.attachmentId}/original`, mimeType: file.mimeType, blob: blob.toString('base64') },
+              resource: {
+                uri: `${config().APP_URL}/api/attachments/${a.attachmentId}/original`,
+                mimeType: file.mimeType,
+                blob: blob.toString('base64'),
+              },
             });
           }
         }
@@ -248,11 +382,16 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     ['export:read'],
     z.object({}),
     async (_a, { ctx }) => {
-      const data = await collectExport(ctx, { includeContents: ctx.oauth?.scopes.has('attachments:read') ?? false });
+      const data = await collectExport(ctx, {
+        includeContents: ctx.oauth?.scopes.has('attachments:read') ?? false,
+      });
       return {
         ...data,
         attachments: data.attachments.map(({ storageKey: _k, ...rest }) => rest),
-        timestamps: data.timestamps.map(({ proof, ...rest }) => ({ ...rest, proofBase64: proof ? Buffer.from(proof).toString('base64') : null })),
+        timestamps: data.timestamps.map(({ proof, ...rest }) => ({
+          ...rest,
+          proofBase64: proof ? Buffer.from(proof).toString('base64') : null,
+        })),
       };
     },
   );
@@ -265,7 +404,13 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     .optional()
     .describe('Existing Actors involved, with optional roles such as sender, recipient, caller');
   const newActors = z
-    .array(z.object({ name: z.string().min(1).max(200), kind: z.enum(['organisation', 'person', 'other']).optional(), role: z.string().max(60).optional() }))
+    .array(
+      z.object({
+        name: z.string().min(1).max(200),
+        kind: z.enum(['organisation', 'person', 'other']).optional(),
+        role: z.string().max(60).optional(),
+      }),
+    )
     .max(20)
     .optional()
     .describe('Actors to create and link (prefer existing Actors where they exist)');
@@ -281,7 +426,10 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     amount: z.string().max(20).optional(),
     currency: z.string().length(3).optional(),
     reference: z.string().max(200).optional(),
-    dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    dueOn: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
   };
 
   tool(
@@ -289,7 +437,10 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     'Record a new Event. Only do this when the user asks. Incomplete Events are fine.',
     ['events:write'],
     z.object({
-      eventType: z.string().max(64).describe('Event type key, e.g. letter_in, phone_call, observation (see list_event_types)'),
+      eventType: z
+        .string()
+        .max(64)
+        .describe('Event type key, e.g. letter_in, phone_call, observation (see list_event_types)'),
       ...eventFields,
       actors: actorLinks,
       newActors,
@@ -324,13 +475,21 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     z.object({
       eventId: uuid,
       eventType: z.string().max(64).optional(),
-      ...Object.fromEntries(Object.entries(eventFields).map(([k, v]) => [k, (v as z.ZodTypeAny).optional()])),
+      ...Object.fromEntries(
+        Object.entries(eventFields).map(([k, v]) => [k, (v as z.ZodTypeAny).optional()]),
+      ),
       actors: actorLinks,
       newActors,
     }) as z.ZodObject,
     async (a, { ctx }) => {
-      const { eventId, eventType, ...rest } = a as Record<string, unknown> & { eventId: string; eventType?: string };
-      return eventsSvc.updateEvent(ctx, eventId, { ...rest, ...(eventType ? { typeId: eventType } : {}) });
+      const { eventId, eventType, ...rest } = a as Record<string, unknown> & {
+        eventId: string;
+        eventType?: string;
+      };
+      return eventsSvc.updateEvent(ctx, eventId, {
+        ...rest,
+        ...(eventType ? { typeId: eventType } : {}),
+      });
     },
     false,
   );
@@ -356,7 +515,7 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
 
   tool(
     'update_actor',
-    'Update an Actor\'s details.',
+    "Update an Actor's details.",
     ['actors:write'],
     z.object({
       actorId: uuid,
@@ -382,7 +541,10 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
       title: z.string().min(1).max(300),
       description: z.string().max(50_000).optional(),
       status: z.enum(['open', 'monitoring', 'resolved', 'closed']).optional(),
-      openedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      openedOn: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
       impactSummary: z.string().max(20_000).optional(),
       eventIds: z.array(uuid).max(1000).optional(),
     }),
@@ -392,15 +554,22 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
 
   tool(
     'update_incident',
-    'Update an Incident\'s title, description, status, dates, impact summary or outcome notes.',
+    "Update an Incident's title, description, status, dates, impact summary or outcome notes.",
     ['incidents:write'],
     z.object({
       incidentId: uuid,
       title: z.string().min(1).max(300).optional(),
       description: z.string().max(50_000).optional(),
       status: z.enum(['open', 'monitoring', 'resolved', 'closed']).optional(),
-      openedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-      closedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      openedOn: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+      closedOn: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .nullable()
+        .optional(),
       impactSummary: z.string().max(20_000).optional(),
       outcomeNotes: z.string().max(20_000).optional(),
     }),
@@ -408,39 +577,78 @@ function buildServer(authInfo: AuthInfo | undefined): McpServer {
     false,
   );
 
-  tool('add_event_to_incident', 'Add one or more existing Events to an Incident.', ['incidents:write'], z.object({ incidentId: uuid, eventIds: z.array(uuid).min(1).max(500) }), async (a, { ctx }) => ({
-    added: await incidentsSvc.addEventsToIncident(ctx, a.incidentId, a.eventIds),
-  }), false);
+  tool(
+    'add_event_to_incident',
+    'Add one or more existing Events to an Incident.',
+    ['incidents:write'],
+    z.object({ incidentId: uuid, eventIds: z.array(uuid).min(1).max(500) }),
+    async (a, { ctx }) => ({
+      added: await incidentsSvc.addEventsToIncident(ctx, a.incidentId, a.eventIds),
+    }),
+    false,
+  );
 
-  tool('remove_event_from_incident', 'Remove an Event from an Incident. The Event itself is not changed.', ['incidents:write'], z.object({ incidentId: uuid, eventId: uuid }), async (a, { ctx }) => {
-    await incidentsSvc.removeEventFromIncident(ctx, a.incidentId, a.eventId);
-    return { removed: true };
-  }, false);
+  tool(
+    'remove_event_from_incident',
+    'Remove an Event from an Incident. The Event itself is not changed.',
+    ['incidents:write'],
+    z.object({ incidentId: uuid, eventId: uuid }),
+    async (a, { ctx }) => {
+      await incidentsSvc.removeEventFromIncident(ctx, a.incidentId, a.eventId);
+      return { removed: true };
+    },
+    false,
+  );
 
-  tool('link_events', 'Mark two Events as related.', ['events:write'], z.object({ eventId: uuid, relatedEventId: uuid, note: z.string().max(500).optional() }), async (a, { ctx }) => {
-    await eventsSvc.linkEvents(ctx, a.eventId, a.relatedEventId, a.note);
-    return { linked: true };
-  }, false);
+  tool(
+    'link_events',
+    'Mark two Events as related.',
+    ['events:write'],
+    z.object({ eventId: uuid, relatedEventId: uuid, note: z.string().max(500).optional() }),
+    async (a, { ctx }) => {
+      await eventsSvc.linkEvents(ctx, a.eventId, a.relatedEventId, a.note);
+      return { linked: true };
+    },
+    false,
+  );
 
   tool(
     'attach_file',
     'Attach a file to an Event. Provide the file as base64. The original is stored unchanged with its SHA-256; OCR runs in the background.',
     ['attachments:write'],
-    z.object({ eventId: uuid, filename: z.string().min(1).max(200), contentBase64: z.string().min(4).max(30_000_000) }),
+    z.object({
+      eventId: uuid,
+      filename: z.string().min(1).max(200),
+      contentBase64: z.string().min(4).max(30_000_000),
+    }),
     async (a, { ctx }) => {
       const bytes = Buffer.from(a.contentBase64, 'base64');
-      if (!bytes.length) throw new AppError('The file content is empty or not valid base64', 400, 'validation_error');
-      if (bytes.length > Math.min(config().maxUploadBytes, 20 * 1024 * 1024)) throw new AppError('The file is too large to attach through this connection', 400, 'validation_error');
+      if (!bytes.length)
+        throw new AppError(
+          'The file content is empty or not valid base64',
+          400,
+          'validation_error',
+        );
+      if (bytes.length > Math.min(config().maxUploadBytes, 20 * 1024 * 1024))
+        throw new AppError(
+          'The file is too large to attach through this connection',
+          400,
+          'validation_error',
+        );
       await mkdir(UPLOAD_TMP_DIR, { recursive: true });
       const tmpPath = path.join(UPLOAD_TMP_DIR, `mcp-${randomUUID()}`);
       await writeFile(tmpPath, bytes, { mode: 0o600 });
       try {
-        return await attachmentsSvc.storeAttachment(ctx, { eventId: a.eventId }, {
-          tmpPath,
-          originalFilename: a.filename,
-          sizeBytes: bytes.length,
-          sha256: createHash('sha256').update(bytes).digest('hex'),
-        });
+        return await attachmentsSvc.storeAttachment(
+          ctx,
+          { eventId: a.eventId },
+          {
+            tmpPath,
+            originalFilename: a.filename,
+            sizeBytes: bytes.length,
+            sha256: createHash('sha256').update(bytes).digest('hex'),
+          },
+        );
       } finally {
         await rm(tmpPath, { force: true });
       }
@@ -463,9 +671,22 @@ export function mcpHandler() {
 }
 
 /** Turn a verified token into the AuthInfo handed to the MCP handler. */
-export async function authInfoFor(token: VerifiedToken, meta: { ip?: string | null; userAgent?: string | null }): Promise<AuthInfo> {
-  const base = await resolveContext({ userId: token.userId, ownerId: token.ownerId, via: 'mcp', ip: meta.ip, userAgent: meta.userAgent });
-  const accessContext = withOAuth(base, { clientId: token.clientId, grantId: token.grantId, scopes: token.scopes });
+export async function authInfoFor(
+  token: VerifiedToken,
+  meta: { ip?: string | null; userAgent?: string | null },
+): Promise<AuthInfo> {
+  const base = await resolveContext({
+    userId: token.userId,
+    ownerId: token.ownerId,
+    via: 'mcp',
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
+  const accessContext = withOAuth(base, {
+    clientId: token.clientId,
+    grantId: token.grantId,
+    scopes: token.scopes,
+  });
   return {
     token: token.token,
     clientId: token.clientId,

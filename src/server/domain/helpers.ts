@@ -71,20 +71,40 @@ async function validateTargets(ownerId: string, g: z.output<typeof grantInputSch
   const actorIds = cleanIds(g.actorIds ?? []);
   const incidentIds = cleanIds(g.incidentIds ?? []);
   if (g.scopeType === 'actors') {
-    if (!actorIds.length) throw new ValidationError('Choose at least one Actor', { actorIds: 'Choose at least one Actor.' });
+    if (!actorIds.length)
+      throw new ValidationError('Choose at least one Actor', {
+        actorIds: 'Choose at least one Actor.',
+      });
     const found = await db()
       .select({ id: actors.id })
       .from(actors)
-      .where(and(eq(actors.ownerId, ownerId), inArray(actors.id, actorIds), isNull(actors.deletedAt)));
-    if (found.length !== actorIds.length) throw new ValidationError('Unknown Actor', { actorIds: 'One of the Actors could not be found.' });
+      .where(
+        and(eq(actors.ownerId, ownerId), inArray(actors.id, actorIds), isNull(actors.deletedAt)),
+      );
+    if (found.length !== actorIds.length)
+      throw new ValidationError('Unknown Actor', {
+        actorIds: 'One of the Actors could not be found.',
+      });
   }
   if (g.scopeType === 'incidents') {
-    if (!incidentIds.length) throw new ValidationError('Choose at least one Incident', { incidentIds: 'Choose at least one Incident.' });
+    if (!incidentIds.length)
+      throw new ValidationError('Choose at least one Incident', {
+        incidentIds: 'Choose at least one Incident.',
+      });
     const found = await db()
       .select({ id: incidents.id })
       .from(incidents)
-      .where(and(eq(incidents.ownerId, ownerId), inArray(incidents.id, incidentIds), isNull(incidents.deletedAt)));
-    if (found.length !== incidentIds.length) throw new ValidationError('Unknown Incident', { incidentIds: 'One of the Incidents could not be found.' });
+      .where(
+        and(
+          eq(incidents.ownerId, ownerId),
+          inArray(incidents.id, incidentIds),
+          isNull(incidents.deletedAt),
+        ),
+      );
+    if (found.length !== incidentIds.length)
+      throw new ValidationError('Unknown Incident', {
+        incidentIds: 'One of the Incidents could not be found.',
+      });
   }
   return {
     actorIds: g.scopeType === 'actors' ? actorIds : [],
@@ -107,7 +127,9 @@ function scopeSummary(g: GrantDTO): string {
         : g.dateTo
           ? ` up to ${g.dateTo}`
           : '';
-  const caps = ['view', ...(g.canAdd ? ['add'] : []), ...(g.canExport ? ['export'] : [])].join(', ');
+  const caps = ['view', ...(g.canAdd ? ['add'] : []), ...(g.canExport ? ['export'] : [])].join(
+    ', ',
+  );
   return `${what}${when} (${caps})`;
 }
 
@@ -157,7 +179,10 @@ async function loadGrantDTOs(relationshipIds: string[]): Promise<Map<string, Gra
 export async function listHelpers(ctx: AccessContext): Promise<HelperDTO[]> {
   if (!isOwner(ctx) || ctx.oauth) throw new ForbiddenError();
   const rels = await db()
-    .select({ rel: helperRelationships, helper: { id: users.id, displayName: users.displayName, username: users.username } })
+    .select({
+      rel: helperRelationships,
+      helper: { id: users.id, displayName: users.displayName, username: users.username },
+    })
     .from(helperRelationships)
     .leftJoin(users, eq(users.id, helperRelationships.helperUserId))
     .where(eq(helperRelationships.ownerId, ctx.ownerId))
@@ -169,7 +194,10 @@ export async function listHelpers(ctx: AccessContext): Promise<HelperDTO[]> {
         .from(invitations)
         .where(
           and(
-            inArray(invitations.relationshipId, rels.map((r) => r.rel.id)),
+            inArray(
+              invitations.relationshipId,
+              rels.map((r) => r.rel.id),
+            ),
             isNull(invitations.usedAt),
             isNull(invitations.revokedAt),
             gt(invitations.expiresAt, new Date()),
@@ -200,15 +228,35 @@ export interface InvitationResult {
   emailed: boolean;
 }
 
-async function createInvitationRecord(ownerId: string, relationshipId: string, email: string | null, createdBy: string) {
+async function createInvitationRecord(
+  ownerId: string,
+  relationshipId: string,
+  email: string | null,
+  createdBy: string,
+) {
   const token = randomToken(32);
   const expiresAt = new Date(Date.now() + config().INVITATION_TTL_HOURS * 3600_000);
   // Any earlier unused invitation for this relationship stops working.
   await db()
     .update(invitations)
     .set({ revokedAt: new Date() })
-    .where(and(eq(invitations.relationshipId, relationshipId), isNull(invitations.usedAt), isNull(invitations.revokedAt)));
-  await db().insert(invitations).values({ ownerId, relationshipId, tokenHash: tokenHash(token, 'invitation'), email, expiresAt, createdBy });
+    .where(
+      and(
+        eq(invitations.relationshipId, relationshipId),
+        isNull(invitations.usedAt),
+        isNull(invitations.revokedAt),
+      ),
+    );
+  await db()
+    .insert(invitations)
+    .values({
+      ownerId,
+      relationshipId,
+      tokenHash: tokenHash(token, 'invitation'),
+      email,
+      expiresAt,
+      createdBy,
+    });
   return { token, expiresAt, url: `${config().APP_URL}/invite/${token}` };
 }
 
@@ -218,9 +266,15 @@ export async function inviteHelper(
 ): Promise<InvitationResult> {
   if (!isOwner(ctx) || ctx.oauth) throw new ForbiddenError();
   const label = input.label?.trim();
-  if (!label || label.length > 120) throw new ValidationError('Enter a name for this Helper', { label: 'Enter a name of up to 120 characters.' });
+  if (!label || label.length > 120)
+    throw new ValidationError('Enter a name for this Helper', {
+      label: 'Enter a name of up to 120 characters.',
+    });
   const email = input.email?.trim() || null;
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ValidationError('Enter a valid email address', { email: 'Enter a valid email address.' });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    throw new ValidationError('Enter a valid email address', {
+      email: 'Enter a valid email address.',
+    });
   const grant = parse(grantInputSchema, input.grant);
   const targets = await validateTargets(ctx.ownerId, grant);
   const relationshipId = await db().transaction(async (tx) => {
@@ -232,11 +286,18 @@ export async function inviteHelper(
     return rel!.id;
   });
   const invite = await createInvitationRecord(ctx.ownerId, relationshipId, email, ctx.userId);
-  await auditCtx(ctx, 'helper.invited', { type: 'helper', id: relationshipId, metadata: { emailed: Boolean(email && input.sendEmail) } });
+  await auditCtx(ctx, 'helper.invited', {
+    type: 'helper',
+    id: relationshipId,
+    metadata: { emailed: Boolean(email && input.sendEmail) },
+  });
   const helper = (await listHelpers(ctx)).find((h) => h.id === relationshipId)!;
   let emailed = false;
   if (email && input.sendEmail !== false && mailConfigured()) {
-    const [owner] = await db().select({ name: users.displayName }).from(users).where(eq(users.id, ctx.ownerId));
+    const [owner] = await db()
+      .select({ name: users.displayName })
+      .from(users)
+      .where(eq(users.id, ctx.ownerId));
     await sendMail(
       invitationEmail({
         to: email,
@@ -252,16 +313,28 @@ export async function inviteHelper(
   return { helper, url: invite.url, emailed };
 }
 
-export async function reissueInvitation(ctx: AccessContext, relationshipId: string, sendEmail = true): Promise<InvitationResult> {
+export async function reissueInvitation(
+  ctx: AccessContext,
+  relationshipId: string,
+  sendEmail = true,
+): Promise<InvitationResult> {
   if (!isOwner(ctx) || ctx.oauth) throw new ForbiddenError();
   const rel = await loadRelationship(ctx, relationshipId);
-  if (rel.status !== 'pending') throw new ConflictError('This invitation has already been accepted or ended');
+  if (rel.status !== 'pending')
+    throw new ConflictError('This invitation has already been accepted or ended');
   const invite = await createInvitationRecord(ctx.ownerId, rel.id, rel.invitedEmail, ctx.userId);
-  await auditCtx(ctx, 'helper.invited', { type: 'helper', id: rel.id, metadata: { reissued: true } });
+  await auditCtx(ctx, 'helper.invited', {
+    type: 'helper',
+    id: rel.id,
+    metadata: { reissued: true },
+  });
   const helper = (await listHelpers(ctx)).find((h) => h.id === rel.id)!;
   let emailed = false;
   if (rel.invitedEmail && sendEmail && mailConfigured()) {
-    const [owner] = await db().select({ name: users.displayName }).from(users).where(eq(users.id, ctx.ownerId));
+    const [owner] = await db()
+      .select({ name: users.displayName })
+      .from(users)
+      .where(eq(users.id, ctx.ownerId));
     await sendMail(
       invitationEmail({
         to: rel.invitedEmail,
@@ -312,13 +385,37 @@ async function insertGrant(
       createdBy: ctx.userId,
     })
     .returning({ id: accessGrants.id });
-  for (const actorId of targets.actorIds) await tx.insert(grantActors).values({ grantId: grant!.id, actorId });
-  for (const incidentId of targets.incidentIds) await tx.insert(grantIncidents).values({ grantId: grant!.id, incidentId });
-  await auditCtx(ctx, 'grant.created', { type: 'grant', id: grant!.id, metadata: { relationshipId, scopeType: g.scopeType, dateFrom: g.dateFrom, dateTo: g.dateTo, canAdd: g.canAdd, canExport: g.canExport, actorIds: targets.actorIds, incidentIds: targets.incidentIds } }, tx);
+  for (const actorId of targets.actorIds)
+    await tx.insert(grantActors).values({ grantId: grant!.id, actorId });
+  for (const incidentId of targets.incidentIds)
+    await tx.insert(grantIncidents).values({ grantId: grant!.id, incidentId });
+  await auditCtx(
+    ctx,
+    'grant.created',
+    {
+      type: 'grant',
+      id: grant!.id,
+      metadata: {
+        relationshipId,
+        scopeType: g.scopeType,
+        dateFrom: g.dateFrom,
+        dateTo: g.dateTo,
+        canAdd: g.canAdd,
+        canExport: g.canExport,
+        actorIds: targets.actorIds,
+        incidentIds: targets.incidentIds,
+      },
+    },
+    tx,
+  );
   return grant!.id;
 }
 
-export async function addGrant(ctx: AccessContext, relationshipId: string, raw: unknown): Promise<HelperDTO> {
+export async function addGrant(
+  ctx: AccessContext,
+  relationshipId: string,
+  raw: unknown,
+): Promise<HelperDTO> {
   if (!isOwner(ctx) || ctx.oauth) throw new ForbiddenError();
   const rel = await loadRelationship(ctx, relationshipId);
   if (rel.status === 'ended') throw new ConflictError('This Helper relationship has ended');
@@ -332,21 +429,39 @@ export async function addGrant(ctx: AccessContext, relationshipId: string, raw: 
  * Change a grant. Implemented as revoke-and-replace so the audit trail shows
  * exactly what access existed when.
  */
-export async function updateGrant(ctx: AccessContext, grantId: string, raw: unknown): Promise<HelperDTO> {
+export async function updateGrant(
+  ctx: AccessContext,
+  grantId: string,
+  raw: unknown,
+): Promise<HelperDTO> {
   if (!isOwner(ctx) || ctx.oauth) throw new ForbiddenError();
   if (!isUuid(grantId)) throw new NotFoundError('Access grant');
   const [existing] = await db()
     .select()
     .from(accessGrants)
-    .where(and(eq(accessGrants.id, grantId), eq(accessGrants.ownerId, ctx.ownerId), isNull(accessGrants.revokedAt)))
+    .where(
+      and(
+        eq(accessGrants.id, grantId),
+        eq(accessGrants.ownerId, ctx.ownerId),
+        isNull(accessGrants.revokedAt),
+      ),
+    )
     .limit(1);
   if (!existing) throw new NotFoundError('Access grant');
   const g = parse(grantInputSchema, raw);
   const targets = await validateTargets(ctx.ownerId, g);
   await db().transaction(async (tx) => {
-    await tx.update(accessGrants).set({ revokedAt: new Date(), revokedBy: ctx.userId }).where(eq(accessGrants.id, grantId));
+    await tx
+      .update(accessGrants)
+      .set({ revokedAt: new Date(), revokedBy: ctx.userId })
+      .where(eq(accessGrants.id, grantId));
     const newId = await insertGrant(tx, ctx, existing.relationshipId, g, targets);
-    await auditCtx(ctx, 'grant.updated', { type: 'grant', id: grantId, metadata: { replacedBy: newId } }, tx);
+    await auditCtx(
+      ctx,
+      'grant.updated',
+      { type: 'grant', id: grantId, metadata: { replacedBy: newId } },
+      tx,
+    );
   });
   return (await listHelpers(ctx)).find((h) => h.id === existing.relationshipId)!;
 }
@@ -357,7 +472,13 @@ export async function revokeGrant(ctx: AccessContext, grantId: string): Promise<
   const updated = await db()
     .update(accessGrants)
     .set({ revokedAt: new Date(), revokedBy: ctx.userId })
-    .where(and(eq(accessGrants.id, grantId), eq(accessGrants.ownerId, ctx.ownerId), isNull(accessGrants.revokedAt)))
+    .where(
+      and(
+        eq(accessGrants.id, grantId),
+        eq(accessGrants.ownerId, ctx.ownerId),
+        isNull(accessGrants.revokedAt),
+      ),
+    )
     .returning({ id: accessGrants.id });
   if (!updated.length) throw new NotFoundError('Access grant');
   await auditCtx(ctx, 'grant.revoked', { type: 'grant', id: grantId });
@@ -369,7 +490,10 @@ export async function endHelper(ctx: AccessContext, relationshipId: string): Pro
   const rel = await loadRelationship(ctx, relationshipId);
   const now = new Date();
   await db().transaction(async (tx) => {
-    await tx.update(helperRelationships).set({ status: 'ended', endedAt: now }).where(eq(helperRelationships.id, rel.id));
+    await tx
+      .update(helperRelationships)
+      .set({ status: 'ended', endedAt: now })
+      .where(eq(helperRelationships.id, rel.id));
     await tx
       .update(accessGrants)
       .set({ revokedAt: now, revokedBy: ctx.userId })
@@ -377,12 +501,25 @@ export async function endHelper(ctx: AccessContext, relationshipId: string): Pro
     await tx
       .update(invitations)
       .set({ revokedAt: now })
-      .where(and(eq(invitations.relationshipId, rel.id), isNull(invitations.usedAt), isNull(invitations.revokedAt)));
+      .where(
+        and(
+          eq(invitations.relationshipId, rel.id),
+          isNull(invitations.usedAt),
+          isNull(invitations.revokedAt),
+        ),
+      );
     // OAuth connections the helper made to this record stop working too.
     if (rel.helperUserId) {
-      await tx.execute(sql`UPDATE oauth_connections SET revoked_at = now() WHERE user_id = ${rel.helperUserId}::uuid AND owner_id = ${ctx.ownerId}::uuid AND revoked_at IS NULL`);
+      await tx.execute(
+        sql`UPDATE oauth_connections SET revoked_at = now() WHERE user_id = ${rel.helperUserId}::uuid AND owner_id = ${ctx.ownerId}::uuid AND revoked_at IS NULL`,
+      );
     }
-    await auditCtx(ctx, rel.status === 'pending' ? 'helper.invitation_revoked' : 'helper.ended', { type: 'helper', id: rel.id }, tx);
+    await auditCtx(
+      ctx,
+      rel.status === 'pending' ? 'helper.invitation_revoked' : 'helper.ended',
+      { type: 'helper', id: rel.id },
+      tx,
+    );
   });
 }
 
@@ -393,7 +530,11 @@ export async function endHelper(ctx: AccessContext, relationshipId: string): Pro
 async function findInvitation(token: string) {
   if (!token || token.length > 100) return null;
   const [row] = await db()
-    .select({ inv: invitations, rel: helperRelationships, owner: { id: users.id, displayName: users.displayName } })
+    .select({
+      inv: invitations,
+      rel: helperRelationships,
+      owner: { id: users.id, displayName: users.displayName },
+    })
     .from(invitations)
     .innerJoin(helperRelationships, eq(helperRelationships.id, invitations.relationshipId))
     .innerJoin(users, eq(users.id, invitations.ownerId))
@@ -410,14 +551,23 @@ export type InvitationState = 'valid' | 'expired' | 'used' | 'revoked' | 'invali
  */
 export async function describeInvitation(token: string): Promise<
   | { state: Exclude<InvitationState, 'valid'> }
-  | { state: 'valid'; ownerName: string; label: string; expiresAt: string; grants: GrantDTO[]; summary: string[] }
+  | {
+      state: 'valid';
+      ownerName: string;
+      label: string;
+      expiresAt: string;
+      grants: GrantDTO[];
+      summary: string[];
+    }
 > {
   const row = await findInvitation(token);
   if (!row) return { state: 'invalid' };
   if (row.inv.usedAt) return { state: 'used' };
   if (row.inv.revokedAt || row.rel.status === 'ended') return { state: 'revoked' };
   if (row.inv.expiresAt < new Date()) return { state: 'expired' };
-  const grants = ((await loadGrantDTOs([row.rel.id])).get(row.rel.id) ?? []).filter((g) => !g.revokedAt);
+  const grants = ((await loadGrantDTOs([row.rel.id])).get(row.rel.id) ?? []).filter(
+    (g) => !g.revokedAt,
+  );
   return {
     state: 'valid',
     ownerName: row.owner.displayName,
@@ -432,28 +582,57 @@ export async function describeInvitation(token: string): Promise<
  * Accept an invitation as `userId`. Single use: the invitation is consumed
  * atomically, so a link can never become a standing credential.
  */
-export async function acceptInvitation(token: string, userId: string, meta: { ip?: string | null; userAgent?: string | null }) {
+export async function acceptInvitation(
+  token: string,
+  userId: string,
+  meta: { ip?: string | null; userAgent?: string | null },
+) {
   const row = await findInvitation(token);
-  if (!row || row.inv.usedAt || row.inv.revokedAt || row.rel.status !== 'pending' || row.inv.expiresAt < new Date()) {
+  if (
+    !row ||
+    row.inv.usedAt ||
+    row.inv.revokedAt ||
+    row.rel.status !== 'pending' ||
+    row.inv.expiresAt < new Date()
+  ) {
     throw new ValidationError('This invitation link is no longer valid. Ask for a new one.');
   }
-  if (row.inv.ownerId === userId) throw new ValidationError('You cannot accept an invitation to your own record.');
+  if (row.inv.ownerId === userId)
+    throw new ValidationError('You cannot accept an invitation to your own record.');
   await db().transaction(async (tx) => {
     const consumed = await tx
       .update(invitations)
       .set({ usedAt: new Date(), usedBy: userId })
-      .where(and(eq(invitations.id, row.inv.id), isNull(invitations.usedAt), isNull(invitations.revokedAt)))
+      .where(
+        and(
+          eq(invitations.id, row.inv.id),
+          isNull(invitations.usedAt),
+          isNull(invitations.revokedAt),
+        ),
+      )
       .returning({ id: invitations.id });
     if (!consumed.length) throw new ValidationError('This invitation link has already been used.');
     // If this person already helps this owner, move the new grants onto that relationship.
     const [existing] = await tx
       .select()
       .from(helperRelationships)
-      .where(and(eq(helperRelationships.ownerId, row.inv.ownerId), eq(helperRelationships.helperUserId, userId), eq(helperRelationships.status, 'active')))
+      .where(
+        and(
+          eq(helperRelationships.ownerId, row.inv.ownerId),
+          eq(helperRelationships.helperUserId, userId),
+          eq(helperRelationships.status, 'active'),
+        ),
+      )
       .limit(1);
     if (existing) {
-      await tx.update(accessGrants).set({ relationshipId: existing.id }).where(eq(accessGrants.relationshipId, row.rel.id));
-      await tx.update(helperRelationships).set({ status: 'ended', endedAt: new Date(), helperUserId: userId }).where(eq(helperRelationships.id, row.rel.id));
+      await tx
+        .update(accessGrants)
+        .set({ relationshipId: existing.id })
+        .where(eq(accessGrants.relationshipId, row.rel.id));
+      await tx
+        .update(helperRelationships)
+        .set({ status: 'ended', endedAt: new Date(), helperUserId: userId })
+        .where(eq(helperRelationships.id, row.rel.id));
     } else {
       await tx
         .update(helperRelationships)
@@ -473,8 +652,14 @@ export async function acceptInvitation(token: string, userId: string, meta: { ip
       tx,
     );
   });
-  const [owner] = await db().select({ email: users.email }).from(users).where(eq(users.id, row.inv.ownerId));
-  const [helper] = await db().select({ displayName: users.displayName }).from(users).where(eq(users.id, userId));
+  const [owner] = await db()
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, row.inv.ownerId));
+  const [helper] = await db()
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, userId));
   if (owner?.email) {
     await sendNotification(
       securityNotificationEmail({
@@ -493,11 +678,27 @@ export async function leaveRecord(userId: string, ownerId: string): Promise<void
   const rels = await db()
     .update(helperRelationships)
     .set({ status: 'ended', endedAt: new Date() })
-    .where(and(eq(helperRelationships.ownerId, ownerId), eq(helperRelationships.helperUserId, userId), eq(helperRelationships.status, 'active')))
+    .where(
+      and(
+        eq(helperRelationships.ownerId, ownerId),
+        eq(helperRelationships.helperUserId, userId),
+        eq(helperRelationships.status, 'active'),
+      ),
+    )
     .returning({ id: helperRelationships.id });
   if (!rels.length) throw new NotFoundError('Record');
   for (const r of rels) {
-    await db().update(accessGrants).set({ revokedAt: new Date(), revokedBy: userId }).where(and(eq(accessGrants.relationshipId, r.id), isNull(accessGrants.revokedAt)));
-    await audit({ action: 'helper.ended', ownerId, actorUserId: userId, targetType: 'helper', targetId: r.id, metadata: { byHelper: true } });
+    await db()
+      .update(accessGrants)
+      .set({ revokedAt: new Date(), revokedBy: userId })
+      .where(and(eq(accessGrants.relationshipId, r.id), isNull(accessGrants.revokedAt)));
+    await audit({
+      action: 'helper.ended',
+      ownerId,
+      actorUserId: userId,
+      targetType: 'helper',
+      targetId: r.id,
+      metadata: { byHelper: true },
+    });
   }
 }

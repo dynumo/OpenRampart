@@ -9,7 +9,12 @@ import { oauthPayloads } from '../db/schema.js';
  * interface. Tokens are looked up by their identifier, which is a random
  * value only known to the client.
  */
-type Payload = Record<string, unknown> & { grantId?: string; userCode?: string; uid?: string; consumed?: number };
+type Payload = Record<string, unknown> & {
+  grantId?: string;
+  userCode?: string;
+  uid?: string;
+  consumed?: number;
+};
 
 export class PostgresAdapter {
   constructor(private readonly model: string) {}
@@ -29,7 +34,13 @@ export class PostgresAdapter {
       })
       .onConflictDoUpdate({
         target: [oauthPayloads.model, oauthPayloads.id],
-        set: { payload, grantId: payload.grantId ?? null, userCode: payload.userCode ?? null, uid: payload.uid ?? null, expiresAt },
+        set: {
+          payload,
+          grantId: payload.grantId ?? null,
+          userCode: payload.userCode ?? null,
+          uid: payload.uid ?? null,
+          expiresAt,
+        },
       });
   }
 
@@ -37,10 +48,19 @@ export class PostgresAdapter {
     const [row] = await db()
       .select()
       .from(oauthPayloads)
-      .where(and(eq(oauthPayloads.model, this.model), condition, sql`(${oauthPayloads.expiresAt} IS NULL OR ${oauthPayloads.expiresAt} > now())`))
+      .where(
+        and(
+          eq(oauthPayloads.model, this.model),
+          condition,
+          sql`(${oauthPayloads.expiresAt} IS NULL OR ${oauthPayloads.expiresAt} > now())`,
+        ),
+      )
       .limit(1);
     if (!row) return undefined;
-    return { ...row.payload, ...(row.consumedAt ? { consumed: Math.floor(row.consumedAt.getTime() / 1000) } : {}) };
+    return {
+      ...row.payload,
+      ...(row.consumedAt ? { consumed: Math.floor(row.consumedAt.getTime() / 1000) } : {}),
+    };
   }
 
   find(id: string) {
@@ -63,7 +83,9 @@ export class PostgresAdapter {
   }
 
   async destroy(id: string): Promise<void> {
-    await db().delete(oauthPayloads).where(and(eq(oauthPayloads.model, this.model), eq(oauthPayloads.id, id)));
+    await db()
+      .delete(oauthPayloads)
+      .where(and(eq(oauthPayloads.model, this.model), eq(oauthPayloads.id, id)));
   }
 
   async revokeByGrantId(grantId: string): Promise<void> {
@@ -74,5 +96,7 @@ export class PostgresAdapter {
 /** Remove every artefact belonging to a grant, across all models. */
 export async function destroyGrantArtefacts(grantId: string): Promise<void> {
   await db().delete(oauthPayloads).where(eq(oauthPayloads.grantId, grantId));
-  await db().delete(oauthPayloads).where(and(eq(oauthPayloads.model, 'Grant'), eq(oauthPayloads.id, grantId)));
+  await db()
+    .delete(oauthPayloads)
+    .where(and(eq(oauthPayloads.model, 'Grant'), eq(oauthPayloads.id, grantId)));
 }

@@ -29,12 +29,18 @@ export async function startWorker(): Promise<void> {
   });
 
   if (c.TIMESTAMP_PROVIDER !== 'none') {
-    await boss.schedule(QUEUES.timestampSubmit, `*/${Math.min(c.OTS_BATCH_INTERVAL_MINUTES, 59)} * * * *`);
+    await boss.schedule(
+      QUEUES.timestampSubmit,
+      `*/${Math.min(c.OTS_BATCH_INTERVAL_MINUTES, 59)} * * * *`,
+    );
     await boss.schedule(QUEUES.timestampUpgrade, '17 * * * *');
   } else {
     await boss.unschedule(QUEUES.timestampSubmit).catch(() => undefined);
     await boss.unschedule(QUEUES.timestampUpgrade).catch(() => undefined);
   }
   await boss.schedule(QUEUES.maintenance, '41 * * * *');
-  logger.info({ ocr: c.OCR_ENABLED, timestamps: c.TIMESTAMP_PROVIDER }, 'background worker started');
+  logger.info(
+    { ocr: c.OCR_ENABLED, timestamps: c.TIMESTAMP_PROVIDER },
+    'background worker started',
+  );
 }

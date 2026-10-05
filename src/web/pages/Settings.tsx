@@ -1,12 +1,29 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
-import type { ActorDTO, EventSummaryDTO, GrantDTO, HelperDTO, IncidentDTO } from '../../shared/types';
+import type {
+  ActorDTO,
+  EventSummaryDTO,
+  GrantDTO,
+  HelperDTO,
+  IncidentDTO,
+} from '../../shared/types';
 import { SCOPE_DESCRIPTIONS, type OAuthScope } from '../../shared/scopes';
 import { Icon } from '../components/Icon';
 import { PageHeader } from '../components/Layout';
 import { useToast } from '../components/Toasts';
-import { Alert, Checkbox, ConfirmDialog, ErrorSummary, fieldError, Loading, Radio, SelectField, StatusLine, TextField } from '../components/ui';
+import {
+  Alert,
+  Checkbox,
+  ConfirmDialog,
+  ErrorSummary,
+  fieldError,
+  Loading,
+  Radio,
+  SelectField,
+  StatusLine,
+  TextField,
+} from '../components/ui';
 import { api, apiUrl, getRecordOwner } from '../lib/api';
 import { useAuth, useRecord, useSwitchRecord } from '../lib/auth';
 import { bytes, formatDate, formatDateTime } from '../lib/format';
@@ -68,7 +85,9 @@ export function SettingsIndexPage() {
 
 const TIMEZONES = (() => {
   try {
-    return (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf('timeZone');
+    return (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf(
+      'timeZone',
+    );
   } catch {
     return ['Europe/London', 'Europe/Dublin', 'UTC'];
   }
@@ -96,7 +115,10 @@ export function AccountSettingsPage() {
             e.preventDefault();
             setError(null);
             try {
-              await api('/auth/profile', { method: 'PATCH', body: { displayName, email: email || null, timezone } });
+              await api('/auth/profile', {
+                method: 'PATCH',
+                body: { displayName, email: email || null, timezone },
+              });
               await refresh();
               toast('Profile saved');
             } catch (err) {
@@ -106,9 +128,28 @@ export function AccountSettingsPage() {
         >
           <ErrorSummary error={error} />
           <p className="small muted">Username: {state?.user?.username}</p>
-          <TextField label="Name" value={displayName} onChange={setDisplayName} error={fieldError(error, 'displayName')} />
-          <TextField label="Email" type="email" optional value={email} onChange={setEmail} hint="Used for password reset and security notices." error={fieldError(error, 'email')} />
-          <SelectField label="Time zone" value={timezone} onChange={setTimezone} hint="Dates in your record are shown and filtered in this time zone." options={TIMEZONES.map((t) => ({ value: t, label: t }))} />
+          <TextField
+            label="Name"
+            value={displayName}
+            onChange={setDisplayName}
+            error={fieldError(error, 'displayName')}
+          />
+          <TextField
+            label="Email"
+            type="email"
+            optional
+            value={email}
+            onChange={setEmail}
+            hint="Used for password reset and security notices."
+            error={fieldError(error, 'email')}
+          />
+          <SelectField
+            label="Time zone"
+            value={timezone}
+            onChange={setTimezone}
+            hint="Dates in your record are shown and filtered in this time zone."
+            options={TIMEZONES.map((t) => ({ value: t, label: t }))}
+          />
           <button className="btn btn-primary" type="submit">
             Save profile
           </button>
@@ -122,7 +163,10 @@ export function AccountSettingsPage() {
             e.preventDefault();
             setPwError(null);
             try {
-              await api('/auth/password', { method: 'POST', body: { currentPassword: current, newPassword: next } });
+              await api('/auth/password', {
+                method: 'POST',
+                body: { currentPassword: current, newPassword: next },
+              });
               setCurrent('');
               setNext('');
               await refresh();
@@ -133,8 +177,23 @@ export function AccountSettingsPage() {
           }}
         >
           <ErrorSummary error={pwError} />
-          <TextField label="Current password" type="password" value={current} onChange={setCurrent} autoComplete="current-password" error={fieldError(pwError, 'currentPassword')} />
-          <TextField label="New password" type="password" value={next} onChange={setNext} autoComplete="new-password" hint="At least 12 characters." error={fieldError(pwError, 'password')} />
+          <TextField
+            label="Current password"
+            type="password"
+            value={current}
+            onChange={setCurrent}
+            autoComplete="current-password"
+            error={fieldError(pwError, 'currentPassword')}
+          />
+          <TextField
+            label="New password"
+            type="password"
+            value={next}
+            onChange={setNext}
+            autoComplete="new-password"
+            hint="At least 12 characters."
+            error={fieldError(pwError, 'password')}
+          />
           <button className="btn btn-primary" type="submit">
             Change password
           </button>
@@ -156,8 +215,26 @@ interface SessionRow {
 
 function describeDevice(ua: string | null): string {
   if (!ua) return 'Unknown device';
-  const browser = /Firefox\//.test(ua) ? 'Firefox' : /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
-  const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+  const browser = /Firefox\//.test(ua)
+    ? 'Firefox'
+    : /Edg\//.test(ua)
+      ? 'Edge'
+      : /Chrome\//.test(ua)
+        ? 'Chrome'
+        : /Safari\//.test(ua)
+          ? 'Safari'
+          : 'Browser';
+  const os = /iPhone|iPad/.test(ua)
+    ? 'iOS'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /Mac OS X/.test(ua)
+        ? 'macOS'
+        : /Windows/.test(ua)
+          ? 'Windows'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : '';
   return `${browser}${os ? ` on ${os}` : ''}`;
 }
 
@@ -166,7 +243,10 @@ export function SecuritySettingsPage() {
   const { state, refresh } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
-  const sessions = useQuery({ queryKey: ['sessions'], queryFn: () => api<{ sessions: SessionRow[] }>('/auth/sessions') });
+  const sessions = useQuery({
+    queryKey: ['sessions'],
+    queryFn: () => api<{ sessions: SessionRow[] }>('/auth/sessions'),
+  });
   const [replacing, setReplacing] = useState(false);
   const [password, setPassword] = useState('');
   const [codes, setCodes] = useState<string[] | null>(null);
@@ -174,16 +254,27 @@ export function SecuritySettingsPage() {
   const tz = state?.user?.timezone;
   return (
     <>
-      <PageHeader title="Security" lede={<Link to="/settings/security/audit">View the Audit Log</Link>} />
+      <PageHeader
+        title="Security"
+        lede={<Link to="/settings/security/audit">View the Audit Log</Link>}
+      />
       {state?.user?.previousLoginAt ? (
         <Alert kind="info">
-          Before this session, you last signed in on {formatDateTime(state.user.previousLoginAt, tz)}
-          {state.user.previousLoginIp ? ` from ${state.user.previousLoginIp}` : ''}. If that was not you, change your password and sign out other devices.
+          Before this session, you last signed in on{' '}
+          {formatDateTime(state.user.previousLoginAt, tz)}
+          {state.user.previousLoginIp ? ` from ${state.user.previousLoginIp}` : ''}. If that was not
+          you, change your password and sign out other devices.
         </Alert>
       ) : null}
       <section className="card" aria-labelledby="totp-h">
         <h2 id="totp-h">Two-step sign-in</h2>
-        <p>{state?.user?.totpEnabled ? <StatusLine ok>An authenticator app is set up.</StatusLine> : <StatusLine warn>Not set up.</StatusLine>}</p>
+        <p>
+          {state?.user?.totpEnabled ? (
+            <StatusLine ok>An authenticator app is set up.</StatusLine>
+          ) : (
+            <StatusLine warn>Not set up.</StatusLine>
+          )}
+        </p>
         {replacing ? (
           <TotpEnrolment
             replacing={state?.user?.totpEnabled}
@@ -195,13 +286,18 @@ export function SecuritySettingsPage() {
           />
         ) : (
           <button type="button" className="btn" onClick={() => setReplacing(true)}>
-            {state?.user?.totpEnabled ? 'Move to a new authenticator app' : 'Set up an authenticator app'}
+            {state?.user?.totpEnabled
+              ? 'Move to a new authenticator app'
+              : 'Set up an authenticator app'}
           </button>
         )}
       </section>
       <section className="card" aria-labelledby="rc-h" style={{ marginTop: '1rem' }}>
         <h2 id="rc-h">Recovery codes</h2>
-        <p>{state?.recoveryCodesRemaining ?? 0} unused recovery code(s) remaining. Each code can be used once if you lose your authenticator app.</p>
+        <p>
+          {state?.recoveryCodesRemaining ?? 0} unused recovery code(s) remaining. Each code can be
+          used once if you lose your authenticator app.
+        </p>
         {codes ? (
           <>
             <Alert kind="success" title="New recovery codes">
@@ -216,7 +312,10 @@ export function SecuritySettingsPage() {
               e.preventDefault();
               setError(null);
               try {
-                const r = await api<{ recoveryCodes: string[] }>('/auth/recovery-codes', { method: 'POST', body: { password } });
+                const r = await api<{ recoveryCodes: string[] }>('/auth/recovery-codes', {
+                  method: 'POST',
+                  body: { password },
+                });
                 setCodes(r.recoveryCodes);
                 setPassword('');
                 await refresh();
@@ -226,7 +325,15 @@ export function SecuritySettingsPage() {
             }}
           >
             <ErrorSummary error={error} />
-            <TextField label="Your password" type="password" value={password} onChange={setPassword} autoComplete="current-password" hint="Needed to create new recovery codes." error={fieldError(error, 'currentPassword')} />
+            <TextField
+              label="Your password"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="current-password"
+              hint="Needed to create new recovery codes."
+              error={fieldError(error, 'currentPassword')}
+            />
             <button className="btn" type="submit">
               Create new recovery codes
             </button>
@@ -241,9 +348,11 @@ export function SecuritySettingsPage() {
               {sessions.data.sessions.map((s) => (
                 <li key={s.id} className="row" style={{ justifyContent: 'space-between' }}>
                   <div>
-                    <strong>{describeDevice(s.userAgent)}</strong> {s.current ? <span className="badge badge-success">This device</span> : null}
+                    <strong>{describeDevice(s.userAgent)}</strong>{' '}
+                    {s.current ? <span className="badge badge-success">This device</span> : null}
                     <div className="small muted">
-                      Signed in {formatDateTime(s.createdAt, tz)} · last active {formatDateTime(s.lastSeenAt, tz)}
+                      Signed in {formatDateTime(s.createdAt, tz)} · last active{' '}
+                      {formatDateTime(s.lastSeenAt, tz)}
                       {s.ip ? ` · ${s.ip}` : ''}
                       {s.mfaMethod === 'recovery_code' ? ' · used a recovery code' : ''}
                     </div>
@@ -258,7 +367,8 @@ export function SecuritySettingsPage() {
                         toast('Device signed out');
                       }}
                     >
-                      Sign out<span className="visually-hidden"> {describeDevice(s.userAgent)}</span>
+                      Sign out
+                      <span className="visually-hidden"> {describeDevice(s.userAgent)}</span>
                     </button>
                   ) : null}
                 </li>
@@ -367,13 +477,19 @@ export function AuditLogPage() {
   const q = useInfiniteQuery({
     queryKey: ['audit', action],
     initialPageParam: null as number | null,
-    queryFn: ({ pageParam }) => api<{ entries: AuditEntry[]; nextBefore: number | null }>('/settings/audit', { query: { before: pageParam ?? undefined, action: action || undefined, limit: 100 } }),
+    queryFn: ({ pageParam }) =>
+      api<{ entries: AuditEntry[]; nextBefore: number | null }>('/settings/audit', {
+        query: { before: pageParam ?? undefined, action: action || undefined, limit: 100 },
+      }),
     getNextPageParam: (p) => p.nextBefore,
   });
   const entries = q.data?.pages.flatMap((p) => p.entries) ?? [];
   return (
     <>
-      <PageHeader title="Audit Log" lede="Security and account activity. This is separate from your Event timeline; nothing here becomes an Event unless you choose to record it." />
+      <PageHeader
+        title="Audit Log"
+        lede="Security and account activity. This is separate from your Event timeline; nothing here becomes an Event unless you choose to record it."
+      />
       <ErrorSummary error={error} />
       <div style={{ maxWidth: '22rem' }}>
         <SelectField
@@ -414,12 +530,24 @@ export function AuditLogPage() {
                 <td>{formatDateTime(e.occurredAt, state?.user?.timezone)}</td>
                 <td>
                   {ACTION_LABELS[e.action] ?? e.action}
-                  {e.outcome === 'failure' ? <span className="badge badge-risk-high"> failed</span> : null}
-                  {e.via === 'mcp' ? <div className="small muted">through a connected application</div> : null}
-                  {e.actorUserId && e.actorUserId !== state?.user?.id && e.ownRecord ? <div className="small muted">by a Helper or another account</div> : null}
+                  {e.outcome === 'failure' ? (
+                    <span className="badge badge-risk-high"> failed</span>
+                  ) : null}
+                  {e.via === 'mcp' ? (
+                    <div className="small muted">through a connected application</div>
+                  ) : null}
+                  {e.actorUserId && e.actorUserId !== state?.user?.id && e.ownRecord ? (
+                    <div className="small muted">by a Helper or another account</div>
+                  ) : null}
                 </td>
                 <td className="small">
-                  {[e.ip, e.userAgent ? describeDevice(e.userAgent) : null, typeof e.metadata.client === 'string' ? e.metadata.client : null, typeof e.metadata.method === 'string' ? `method: ${e.metadata.method}` : null, e.targetType ? `${e.targetType}` : null]
+                  {[
+                    e.ip,
+                    e.userAgent ? describeDevice(e.userAgent) : null,
+                    typeof e.metadata.client === 'string' ? e.metadata.client : null,
+                    typeof e.metadata.method === 'string' ? `method: ${e.metadata.method}` : null,
+                    e.targetType ? `${e.targetType}` : null,
+                  ]
                     .filter(Boolean)
                     .join(' · ')}
                 </td>
@@ -431,14 +559,20 @@ export function AuditLogPage() {
                       onClick={async () => {
                         setError(null);
                         try {
-                          const ev = await api<{ id: string }>(`/settings/audit/${e.id}/event`, { method: 'POST', body: {} });
+                          const ev = await api<{ id: string }>(`/settings/audit/${e.id}/event`, {
+                            method: 'POST',
+                            body: {},
+                          });
                           navigate(`/events/${ev.id}`);
                         } catch (err) {
                           setError(err);
                         }
                       }}
                     >
-                      Record as Event<span className="visually-hidden">: {ACTION_LABELS[e.action] ?? e.action} at {formatDateTime(e.occurredAt)}</span>
+                      Record as Event
+                      <span className="visually-hidden">
+                        : {ACTION_LABELS[e.action] ?? e.action} at {formatDateTime(e.occurredAt)}
+                      </span>
                     </button>
                   ) : null}
                 </td>
@@ -470,75 +604,212 @@ interface GrantDraft {
   note: string;
 }
 
-const emptyGrant: GrantDraft = { scopeType: 'actors', actorIds: [], incidentIds: [], dateFrom: '', dateTo: '', canAdd: false, canExport: false, coActorVisibility: 'redacted', note: '' };
+const emptyGrant: GrantDraft = {
+  scopeType: 'actors',
+  actorIds: [],
+  incidentIds: [],
+  dateFrom: '',
+  dateTo: '',
+  canAdd: false,
+  canExport: false,
+  coActorVisibility: 'redacted',
+  note: '',
+};
 
 function grantToPayload(g: GrantDraft) {
   return { ...g, dateFrom: g.dateFrom || null, dateTo: g.dateTo || null, note: g.note || null };
 }
 
-function GrantEditor({ value, onChange, error }: { value: GrantDraft; onChange: (g: GrantDraft) => void; error?: unknown }) {
-  const actors = useQuery({ queryKey: ['actors', 'grant'], queryFn: () => api<{ items: ActorDTO[] }>('/actors', { query: { limit: 500 } }) });
-  const incidents = useQuery({ queryKey: ['incidents', 'grant'], queryFn: () => api<{ items: IncidentDTO[] }>('/incidents') });
+function GrantEditor({
+  value,
+  onChange,
+  error,
+}: {
+  value: GrantDraft;
+  onChange: (g: GrantDraft) => void;
+  error?: unknown;
+}) {
+  const actors = useQuery({
+    queryKey: ['actors', 'grant'],
+    queryFn: () => api<{ items: ActorDTO[] }>('/actors', { query: { limit: 500 } }),
+  });
+  const incidents = useQuery({
+    queryKey: ['incidents', 'grant'],
+    queryFn: () => api<{ items: IncidentDTO[] }>('/incidents'),
+  });
   const set = (patch: Partial<GrantDraft>) => onChange({ ...value, ...patch });
   return (
     <div className="stack">
       <fieldset>
         <legend>What can they see?</legend>
-        <Radio name="scope" value="actors" checked={value.scopeType === 'actors'} onChange={() => set({ scopeType: 'actors', coActorVisibility: 'redacted' })} label="Events involving particular Actors" hint="For example, only your dealings with your landlord." />
-        <Radio name="scope" value="incidents" checked={value.scopeType === 'incidents'} onChange={() => set({ scopeType: 'incidents', coActorVisibility: 'name' })} label="Particular Incidents" hint="Only the Events grouped in the Incidents you choose." />
-        <Radio name="scope" value="all" checked={value.scopeType === 'all'} onChange={() => set({ scopeType: 'all' })} label="All records" hint="Everything in your record (within the dates below, if any)." />
+        <Radio
+          name="scope"
+          value="actors"
+          checked={value.scopeType === 'actors'}
+          onChange={() => set({ scopeType: 'actors', coActorVisibility: 'redacted' })}
+          label="Events involving particular Actors"
+          hint="For example, only your dealings with your landlord."
+        />
+        <Radio
+          name="scope"
+          value="incidents"
+          checked={value.scopeType === 'incidents'}
+          onChange={() => set({ scopeType: 'incidents', coActorVisibility: 'name' })}
+          label="Particular Incidents"
+          hint="Only the Events grouped in the Incidents you choose."
+        />
+        <Radio
+          name="scope"
+          value="all"
+          checked={value.scopeType === 'all'}
+          onChange={() => set({ scopeType: 'all' })}
+          label="All records"
+          hint="Everything in your record (within the dates below, if any)."
+        />
       </fieldset>
       {value.scopeType === 'actors' ? (
         <fieldset>
           <legend>Actors</legend>
-          {fieldError(error, 'actorIds') ? <span className="field-error">{fieldError(error, 'actorIds')}</span> : null}
+          {fieldError(error, 'actorIds') ? (
+            <span className="field-error">{fieldError(error, 'actorIds')}</span>
+          ) : null}
           {(actors.data?.items ?? []).map((a) => (
-            <Checkbox key={a.id} label={a.name} checked={value.actorIds.includes(a.id)} onChange={(c) => set({ actorIds: c ? [...value.actorIds, a.id] : value.actorIds.filter((x) => x !== a.id) })} />
+            <Checkbox
+              key={a.id}
+              label={a.name}
+              checked={value.actorIds.includes(a.id)}
+              onChange={(c) =>
+                set({
+                  actorIds: c
+                    ? [...value.actorIds, a.id]
+                    : value.actorIds.filter((x) => x !== a.id),
+                })
+              }
+            />
           ))}
-          {actors.data && !actors.data.items.length ? <p className="muted">You have no Actors yet.</p> : null}
+          {actors.data && !actors.data.items.length ? (
+            <p className="muted">You have no Actors yet.</p>
+          ) : null}
         </fieldset>
       ) : null}
       {value.scopeType === 'incidents' ? (
         <fieldset>
           <legend>Incidents</legend>
-          {fieldError(error, 'incidentIds') ? <span className="field-error">{fieldError(error, 'incidentIds')}</span> : null}
+          {fieldError(error, 'incidentIds') ? (
+            <span className="field-error">{fieldError(error, 'incidentIds')}</span>
+          ) : null}
           {(incidents.data?.items ?? []).map((i) => (
-            <Checkbox key={i.id} label={i.title} checked={value.incidentIds.includes(i.id)} onChange={(c) => set({ incidentIds: c ? [...value.incidentIds, i.id] : value.incidentIds.filter((x) => x !== i.id) })} />
+            <Checkbox
+              key={i.id}
+              label={i.title}
+              checked={value.incidentIds.includes(i.id)}
+              onChange={(c) =>
+                set({
+                  incidentIds: c
+                    ? [...value.incidentIds, i.id]
+                    : value.incidentIds.filter((x) => x !== i.id),
+                })
+              }
+            />
           ))}
-          {incidents.data && !incidents.data.items.length ? <p className="muted">You have no Incidents yet.</p> : null}
+          {incidents.data && !incidents.data.items.length ? (
+            <p className="muted">You have no Incidents yet.</p>
+          ) : null}
         </fieldset>
       ) : null}
       <fieldset>
         <legend>Which dates?</legend>
-        <span className="hint">Optional. Limit access to Events that happened within these dates, so a Helper on a current matter does not see unrelated history.</span>
+        <span className="hint">
+          Optional. Limit access to Events that happened within these dates, so a Helper on a
+          current matter does not see unrelated history.
+        </span>
         <div className="row">
-          <TextField label="From" optional type="date" value={value.dateFrom} onChange={(v) => set({ dateFrom: v })} />
-          <TextField label="To" optional type="date" value={value.dateTo} onChange={(v) => set({ dateTo: v })} error={fieldError(error, 'dateTo')} />
+          <TextField
+            label="From"
+            optional
+            type="date"
+            value={value.dateFrom}
+            onChange={(v) => set({ dateFrom: v })}
+          />
+          <TextField
+            label="To"
+            optional
+            type="date"
+            value={value.dateTo}
+            onChange={(v) => set({ dateTo: v })}
+            error={fieldError(error, 'dateTo')}
+          />
         </div>
       </fieldset>
       <fieldset>
         <legend>What can they do?</legend>
-        <Checkbox label="View" checked disabled onChange={() => undefined} hint="Always included." />
-        <Checkbox label="Add" checked={value.canAdd} onChange={(c) => set({ canAdd: c })} hint="Record new Events and attachments within this access. They cannot change or delete your records." />
-        <Checkbox label="Export" checked={value.canExport} onChange={(c) => set({ canExport: c })} hint="Download a copy of what this access covers, including original files." />
+        <Checkbox
+          label="View"
+          checked
+          disabled
+          onChange={() => undefined}
+          hint="Always included."
+        />
+        <Checkbox
+          label="Add"
+          checked={value.canAdd}
+          onChange={(c) => set({ canAdd: c })}
+          hint="Record new Events and attachments within this access. They cannot change or delete your records."
+        />
+        <Checkbox
+          label="Export"
+          checked={value.canExport}
+          onChange={(c) => set({ canExport: c })}
+          hint="Download a copy of what this access covers, including original files."
+        />
       </fieldset>
       {value.scopeType !== 'all' ? (
         <fieldset>
           <legend>Other Actors on shared Events</legend>
-          <span className="hint">An Event can involve Actors outside this access. Seeing their name never gives access to their other Events or details.</span>
-          <Radio name="coactor" value="redacted" checked={value.coActorVisibility === 'redacted'} onChange={() => set({ coActorVisibility: 'redacted' })} label="Hide them (shown as “another Actor”)" />
-          <Radio name="coactor" value="name" checked={value.coActorVisibility === 'name'} onChange={() => set({ coActorVisibility: 'name' })} label="Show their names" />
+          <span className="hint">
+            An Event can involve Actors outside this access. Seeing their name never gives access to
+            their other Events or details.
+          </span>
+          <Radio
+            name="coactor"
+            value="redacted"
+            checked={value.coActorVisibility === 'redacted'}
+            onChange={() => set({ coActorVisibility: 'redacted' })}
+            label="Hide them (shown as “another Actor”)"
+          />
+          <Radio
+            name="coactor"
+            value="name"
+            checked={value.coActorVisibility === 'name'}
+            onChange={() => set({ coActorVisibility: 'name' })}
+            label="Show their names"
+          />
         </fieldset>
       ) : null}
-      <TextField label="Note for yourself" optional value={value.note} onChange={(v) => set({ note: v })} />
+      <TextField
+        label="Note for yourself"
+        optional
+        value={value.note}
+        onChange={(v) => set({ note: v })}
+      />
     </div>
   );
 }
 
 function grantSummary(g: GrantDTO): string {
-  const what = g.scopeType === 'all' ? 'All records' : g.scopeType === 'actors' ? `Actors: ${g.actors.map((a) => a.name).join(', ')}` : `Incidents: ${g.incidents.map((i) => i.title).join(', ')}`;
-  const when = g.dateFrom || g.dateTo ? ` · ${g.dateFrom ? `from ${formatDate(g.dateFrom)}` : ''}${g.dateFrom && g.dateTo ? ' ' : ''}${g.dateTo ? `to ${formatDate(g.dateTo)}` : ''}` : '';
-  const caps = ['View', g.canAdd ? 'Add' : null, g.canExport ? 'Export' : null].filter(Boolean).join(', ');
+  const what =
+    g.scopeType === 'all'
+      ? 'All records'
+      : g.scopeType === 'actors'
+        ? `Actors: ${g.actors.map((a) => a.name).join(', ')}`
+        : `Incidents: ${g.incidents.map((i) => i.title).join(', ')}`;
+  const when =
+    g.dateFrom || g.dateTo
+      ? ` · ${g.dateFrom ? `from ${formatDate(g.dateFrom)}` : ''}${g.dateFrom && g.dateTo ? ' ' : ''}${g.dateTo ? `to ${formatDate(g.dateTo)}` : ''}`
+      : '';
+  const caps = ['View', g.canAdd ? 'Add' : null, g.canExport ? 'Export' : null]
+    .filter(Boolean)
+    .join(', ');
   return `${what}${when} · ${caps}`;
 }
 
@@ -547,7 +818,10 @@ export function HelpersPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const { state } = useAuth();
-  const list = useQuery({ queryKey: ['helpers'], queryFn: () => api<{ items: HelperDTO[] }>('/settings/helpers') });
+  const list = useQuery({
+    queryKey: ['helpers'],
+    queryFn: () => api<{ items: HelperDTO[] }>('/settings/helpers'),
+  });
   const [inviting, setInviting] = useState(false);
   const [label, setLabel] = useState('');
   const [email, setEmail] = useState('');
@@ -562,7 +836,10 @@ export function HelpersPage() {
     e.preventDefault();
     setError(null);
     try {
-      const r = await api<{ url: string; emailed: boolean }>('/settings/helpers', { method: 'POST', body: { label, email: email || null, sendEmail, grant: grantToPayload(grant) } });
+      const r = await api<{ url: string; emailed: boolean }>('/settings/helpers', {
+        method: 'POST',
+        body: { label, email: email || null, sendEmail, grant: grantToPayload(grant) },
+      });
       setLink(r);
       setInviting(false);
       setLabel('');
@@ -581,7 +858,14 @@ export function HelpersPage() {
         lede="Helpers are people you trust — family, an advocate, a support worker — who can see, and optionally add to, the parts of your record you choose. They are not administrators."
         actions={
           !inviting ? (
-            <button type="button" className="btn btn-primary" onClick={() => { setInviting(true); setLink(null); }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setInviting(true);
+                setLink(null);
+              }}
+            >
               <Icon name="plus" /> Invite a Helper
             </button>
           ) : null
@@ -589,12 +873,23 @@ export function HelpersPage() {
       />
       {link ? (
         <Alert kind="success" title="Invitation created">
-          <p>{link.emailed ? 'We have emailed the invitation. You can also share this link yourself:' : 'Send this link to the person you are inviting. It works once and expires after a few days:'}</p>
+          <p>
+            {link.emailed
+              ? 'We have emailed the invitation. You can also share this link yourself:'
+              : 'Send this link to the person you are inviting. It works once and expires after a few days:'}
+          </p>
           <p className="mono">{link.url}</p>
-          <button type="button" className="btn btn-small" onClick={() => void navigator.clipboard?.writeText(link.url)}>
+          <button
+            type="button"
+            className="btn btn-small"
+            onClick={() => void navigator.clipboard?.writeText(link.url)}
+          >
             Copy link
           </button>
-          <p className="small">For your security this link will not be shown again. You can create a new one at any time.</p>
+          <p className="small">
+            For your security this link will not be shown again. You can create a new one at any
+            time.
+          </p>
         </Alert>
       ) : null}
       {inviting ? (
@@ -602,9 +897,33 @@ export function HelpersPage() {
           <h2 id="invite-h">Invite a Helper</h2>
           <form onSubmit={invite} noValidate className="stack">
             <ErrorSummary error={error} />
-            <TextField label="Who are they?" hint="For example “Sam (support worker)”." value={label} onChange={setLabel} error={fieldError(error, 'label')} />
-            <TextField label="Their email" optional type="email" value={email} onChange={setEmail} error={fieldError(error, 'email')} hint={state?.mailConfigured ? undefined : 'Email is not set up on this server, so you will need to send the link yourself.'} />
-            {email && state?.mailConfigured ? <Checkbox label="Email the invitation to them" checked={sendEmail} onChange={setSendEmail} /> : null}
+            <TextField
+              label="Who are they?"
+              hint="For example “Sam (support worker)”."
+              value={label}
+              onChange={setLabel}
+              error={fieldError(error, 'label')}
+            />
+            <TextField
+              label="Their email"
+              optional
+              type="email"
+              value={email}
+              onChange={setEmail}
+              error={fieldError(error, 'email')}
+              hint={
+                state?.mailConfigured
+                  ? undefined
+                  : 'Email is not set up on this server, so you will need to send the link yourself.'
+              }
+            />
+            {email && state?.mailConfigured ? (
+              <Checkbox
+                label="Email the invitation to them"
+                checked={sendEmail}
+                onChange={setSendEmail}
+              />
+            ) : null}
             <GrantEditor value={grant} onChange={setGrant} error={error} />
             <div className="row">
               <button className="btn btn-primary" type="submit">
@@ -618,15 +937,32 @@ export function HelpersPage() {
         </section>
       ) : null}
       {list.isLoading ? <Loading /> : null}
-      {list.data && !list.data.items.length && !inviting ? <div className="empty">You have not invited any Helpers.</div> : null}
+      {list.data && !list.data.items.length && !inviting ? (
+        <div className="empty">You have not invited any Helpers.</div>
+      ) : null}
       <ul className="plain-list">
         {list.data?.items.map((h) => (
           <li key={h.id} className="card" style={{ marginBottom: '1rem' }}>
             <h2 style={{ marginTop: 0, fontSize: '1.15rem' }}>
-              {h.label} {h.status === 'pending' ? <span className="badge">Invitation pending</span> : h.status === 'ended' ? <span className="badge">Ended</span> : <span className="badge badge-success">Active</span>}
+              {h.label}{' '}
+              {h.status === 'pending' ? (
+                <span className="badge">Invitation pending</span>
+              ) : h.status === 'ended' ? (
+                <span className="badge">Ended</span>
+              ) : (
+                <span className="badge badge-success">Active</span>
+              )}
             </h2>
-            {h.helper ? <p className="small muted">Account: {h.helper.displayName} ({h.helper.username})</p> : null}
-            {h.pendingInvitation ? <p className="small muted">Invitation expires {formatDateTime(h.pendingInvitation.expiresAt)}</p> : null}
+            {h.helper ? (
+              <p className="small muted">
+                Account: {h.helper.displayName} ({h.helper.username})
+              </p>
+            ) : null}
+            {h.pendingInvitation ? (
+              <p className="small muted">
+                Invitation expires {formatDateTime(h.pendingInvitation.expiresAt)}
+              </p>
+            ) : null}
             <h3>Access</h3>
             <ul>
               {h.grants
@@ -634,7 +970,12 @@ export function HelpersPage() {
                 .map((g) => (
                   <li key={g.id}>
                     {grantSummary(g)}
-                    {g.scopeType !== 'all' ? <span className="small muted"> · other Actors {g.coActorVisibility === 'name' ? 'shown by name' : 'hidden'}</span> : null}{' '}
+                    {g.scopeType !== 'all' ? (
+                      <span className="small muted">
+                        {' '}
+                        · other Actors {g.coActorVisibility === 'name' ? 'shown by name' : 'hidden'}
+                      </span>
+                    ) : null}{' '}
                     {h.status !== 'ended' ? (
                       <button
                         type="button"
@@ -672,7 +1013,10 @@ export function HelpersPage() {
                     type="button"
                     className="btn btn-small"
                     onClick={async () => {
-                      const r = await api<{ url: string; emailed: boolean }>(`/settings/helpers/${h.id}/reinvite`, { method: 'POST', body: {} });
+                      const r = await api<{ url: string; emailed: boolean }>(
+                        `/settings/helpers/${h.id}/reinvite`,
+                        { method: 'POST', body: {} },
+                      );
                       setLink(r);
                       await qc.invalidateQueries({ queryKey: ['helpers'] });
                     }}
@@ -680,7 +1024,11 @@ export function HelpersPage() {
                     New invitation link
                   </button>
                 ) : null}
-                <button type="button" className="btn btn-small btn-danger" onClick={() => setEnding(h)}>
+                <button
+                  type="button"
+                  className="btn btn-small btn-danger"
+                  onClick={() => setEnding(h)}
+                >
                   {h.status === 'pending' ? 'Withdraw invitation' : 'End access'}
                 </button>
               </div>
@@ -691,7 +1039,12 @@ export function HelpersPage() {
       <ConfirmDialog
         open={Boolean(ending)}
         title={`End access for ${ending?.label}?`}
-        body={<p>They will immediately stop being able to see your record, and any applications they connected to it will be disconnected. Records they added stay in your record.</p>}
+        body={
+          <p>
+            They will immediately stop being able to see your record, and any applications they
+            connected to it will be disconnected. Records they added stay in your record.
+          </p>
+        }
         confirmLabel="End access"
         danger
         onClose={() => setEnding(null)}
@@ -717,7 +1070,10 @@ function AddGrant({ helperId, onDone }: { helperId: string; onDone: () => void }
         e.preventDefault();
         setError(null);
         try {
-          await api(`/settings/helpers/${helperId}/grants`, { method: 'POST', body: grantToPayload(grant) });
+          await api(`/settings/helpers/${helperId}/grants`, {
+            method: 'POST',
+            body: grantToPayload(grant),
+          });
           onDone();
         } catch (err) {
           setError(err);
@@ -746,19 +1102,36 @@ export function SharedWithMePage() {
   const [leaving, setLeaving] = useState<{ ownerId: string; ownerName: string } | null>(null);
   return (
     <>
-      <PageHeader title="Shared with you" lede="Records other people have invited you to help with." />
-      {!state?.sharedRecords?.length ? <div className="empty">No records are shared with you.</div> : null}
+      <PageHeader
+        title="Shared with you"
+        lede="Records other people have invited you to help with."
+      />
+      {!state?.sharedRecords?.length ? (
+        <div className="empty">No records are shared with you.</div>
+      ) : null}
       <ul className="plain-list">
         {state?.sharedRecords?.map((r) => (
           <li key={r.ownerId} className="row" style={{ justifyContent: 'space-between' }}>
             <span>
-              <strong>{r.ownerName}</strong> <span className="muted small">— you are “{r.label}”</span>
+              <strong>{r.ownerName}</strong>{' '}
+              <span className="muted small">— you are “{r.label}”</span>
             </span>
             <span className="row">
-              <button type="button" className="btn btn-small" onClick={() => { switchRecord(r.ownerId); navigate('/'); }}>
+              <button
+                type="button"
+                className="btn btn-small"
+                onClick={() => {
+                  switchRecord(r.ownerId);
+                  navigate('/');
+                }}
+              >
                 Open record
               </button>
-              <button type="button" className="btn btn-small btn-ghost" onClick={() => setLeaving(r)}>
+              <button
+                type="button"
+                className="btn btn-small btn-ghost"
+                onClick={() => setLeaving(r)}
+              >
                 Stop helping
               </button>
             </span>
@@ -768,7 +1141,9 @@ export function SharedWithMePage() {
       <ConfirmDialog
         open={Boolean(leaving)}
         title={`Stop helping ${leaving?.ownerName}?`}
-        body={<p>You will no longer be able to see their record. They can invite you again later.</p>}
+        body={
+          <p>You will no longer be able to see their record. They can invite you again later.</p>
+        }
         confirmLabel="Stop helping"
         onClose={() => setLeaving(null)}
         onConfirm={async () => {
@@ -801,28 +1176,44 @@ export function ConnectionsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const { state } = useAuth();
-  const list = useQuery({ queryKey: ['connections'], queryFn: () => api<{ items: Connection[] }>('/settings/connections') });
+  const list = useQuery({
+    queryKey: ['connections'],
+    queryFn: () => api<{ items: Connection[] }>('/settings/connections'),
+  });
   const [revoking, setRevoking] = useState<Connection | null>(null);
   const mcpUrl = `${window.location.origin}/mcp`;
   return (
     <>
-      <PageHeader title="MCP Connections" lede="Applications such as AI assistants that you have allowed to use your record through the Model Context Protocol." />
+      <PageHeader
+        title="MCP Connections"
+        lede="Applications such as AI assistants that you have allowed to use your record through the Model Context Protocol."
+      />
       <section className="card" aria-labelledby="connect-h">
         <h2 id="connect-h">Connect an application</h2>
         <p>
-          Add this server address in your MCP client (for example as a “custom connector”): <span className="mono">{mcpUrl}</span>
+          Add this server address in your MCP client (for example as a “custom connector”):{' '}
+          <span className="mono">{mcpUrl}</span>
         </p>
-        <p className="small muted">The application will send you here to sign in and choose exactly what it may do. It never receives your password or authenticator codes.</p>
+        <p className="small muted">
+          The application will send you here to sign in and choose exactly what it may do. It never
+          receives your password or authenticator codes.
+        </p>
       </section>
       {list.isLoading ? <Loading /> : null}
-      {list.data && !list.data.items.length ? <div className="empty" style={{ marginTop: '1rem' }}>No applications are connected.</div> : null}
+      {list.data && !list.data.items.length ? (
+        <div className="empty" style={{ marginTop: '1rem' }}>
+          No applications are connected.
+        </div>
+      ) : null}
       <ul className="plain-list">
         {list.data?.items.map((c) => (
           <li key={c.grantId} className="card" style={{ marginTop: '1rem' }}>
             <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>{c.clientName ?? c.clientId}</h2>
             <p className="small muted">
               Connected {formatDateTime(c.createdAt, state?.user?.timezone)}
-              {c.authorisedByYou ? '' : ` by ${c.userName} (a Helper)`} · returns to {c.redirectHost} · last used {c.lastUsedAt ? formatDateTime(c.lastUsedAt, state?.user?.timezone) : 'never'}
+              {c.authorisedByYou ? '' : ` by ${c.userName} (a Helper)`} · returns to{' '}
+              {c.redirectHost} · last used{' '}
+              {c.lastUsedAt ? formatDateTime(c.lastUsedAt, state?.user?.timezone) : 'never'}
               {!c.onYourRecord ? ' · on a record shared with you' : ''}
             </p>
             <h3>Allowed to</h3>
@@ -831,7 +1222,11 @@ export function ConnectionsPage() {
                 <li key={s}>{SCOPE_DESCRIPTIONS[s as OAuthScope]?.label ?? s}</li>
               ))}
             </ul>
-            <button type="button" className="btn btn-danger btn-small" onClick={() => setRevoking(c)}>
+            <button
+              type="button"
+              className="btn btn-danger btn-small"
+              onClick={() => setRevoking(c)}
+            >
               Disconnect
             </button>
           </li>
@@ -840,7 +1235,9 @@ export function ConnectionsPage() {
       <ConfirmDialog
         open={Boolean(revoking)}
         title={`Disconnect ${revoking?.clientName ?? 'this application'}?`}
-        body={<p>It will immediately lose access. To use it again you will need to connect it again.</p>}
+        body={
+          <p>It will immediately lose access. To use it again you will need to connect it again.</p>
+        }
         confirmLabel="Disconnect"
         danger
         onClose={() => setRevoking(null)}
@@ -856,9 +1253,26 @@ export function ConnectionsPage() {
 }
 
 interface StorageInfo {
-  usage: { files: number; bytes: number; deleted_files: number; ocr_done: number; ocr_pending: number; ocr_failed: number; integrity_failures: number };
+  usage: {
+    files: number;
+    bytes: number;
+    deleted_files: number;
+    ocr_done: number;
+    ocr_pending: number;
+    ocr_failed: number;
+    integrity_failures: number;
+  };
   timestamps: { complete: number; pending: number; failed: number };
-  settings: { bucket: string; endpointHost: string; region: string; maxUploadMb: number; retentionDays: number; ocrEnabled: boolean; ocrLanguages: string; timestampProvider: string };
+  settings: {
+    bucket: string;
+    endpointHost: string;
+    region: string;
+    maxUploadMb: number;
+    retentionDays: number;
+    ocrEnabled: boolean;
+    ocrLanguages: string;
+    timestampProvider: string;
+  };
 }
 
 interface Trash {
@@ -872,7 +1286,10 @@ export function StoragePage() {
   usePageTitle('Storage and trash');
   const qc = useQueryClient();
   const toast = useToast();
-  const info = useQuery({ queryKey: ['storage'], queryFn: () => api<StorageInfo>('/settings/storage') });
+  const info = useQuery({
+    queryKey: ['storage'],
+    queryFn: () => api<StorageInfo>('/settings/storage'),
+  });
   const trash = useQuery({ queryKey: ['trash'], queryFn: () => api<Trash>('/trash') });
   const restore = async (path: string, what: string) => {
     await api(path, { method: 'POST' });
@@ -894,13 +1311,22 @@ export function StoragePage() {
               </dd>
               <dt>Text read</dt>
               <dd>
-                {s.usage.ocr_done} done, {s.usage.ocr_pending} waiting, {s.usage.ocr_failed} not readable
+                {s.usage.ocr_done} done, {s.usage.ocr_pending} waiting, {s.usage.ocr_failed} not
+                readable
               </dd>
               <dt>Integrity</dt>
-              <dd>{s.usage.integrity_failures ? <StatusLine>{s.usage.integrity_failures} file(s) failed a check</StatusLine> : <StatusLine ok>No problems found</StatusLine>}</dd>
+              <dd>
+                {s.usage.integrity_failures ? (
+                  <StatusLine>{s.usage.integrity_failures} file(s) failed a check</StatusLine>
+                ) : (
+                  <StatusLine ok>No problems found</StatusLine>
+                )}
+              </dd>
               <dt>Timestamps</dt>
               <dd>
-                {s.settings.timestampProvider === 'none' ? 'Not enabled on this server' : `${s.timestamps.complete} verified, ${s.timestamps.pending} pending`}
+                {s.settings.timestampProvider === 'none'
+                  ? 'Not enabled on this server'
+                  : `${s.timestamps.complete} verified, ${s.timestamps.pending} pending`}
               </dd>
             </dl>
           </section>
@@ -924,18 +1350,32 @@ export function StoragePage() {
         <Loading />
       )}
       <h2>Trash</h2>
-      <p className="muted">Deleted items are kept for {s?.settings.retentionDays ?? 30} days and then permanently removed. Restore anything deleted by mistake.</p>
+      <p className="muted">
+        Deleted items are kept for {s?.settings.retentionDays ?? 30} days and then permanently
+        removed. Restore anything deleted by mistake.
+      </p>
       {trash.data ? (
-        trash.data.events.length + trash.data.incidents.length + trash.data.attachments.length + trash.data.actors.length === 0 ? (
+        trash.data.events.length +
+          trash.data.incidents.length +
+          trash.data.attachments.length +
+          trash.data.actors.length ===
+        0 ? (
           <div className="empty">The trash is empty.</div>
         ) : (
           <ul className="plain-list">
             {trash.data.events.map((e) => (
               <li key={e.id} className="row" style={{ justifyContent: 'space-between' }}>
                 <span>
-                  Event: {e.displayTitle} <span className="small muted">— removed permanently {e.purgeAfter ? formatDate(e.purgeAfter) : 'later'}</span>
+                  Event: {e.displayTitle}{' '}
+                  <span className="small muted">
+                    — removed permanently {e.purgeAfter ? formatDate(e.purgeAfter) : 'later'}
+                  </span>
                 </span>
-                <button type="button" className="btn btn-small" onClick={() => restore(`/events/${e.id}/restore`, 'Event')}>
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  onClick={() => restore(`/events/${e.id}/restore`, 'Event')}
+                >
                   Restore<span className="visually-hidden"> {e.displayTitle}</span>
                 </button>
               </li>
@@ -943,7 +1383,11 @@ export function StoragePage() {
             {trash.data.incidents.map((i) => (
               <li key={i.id} className="row" style={{ justifyContent: 'space-between' }}>
                 <span>Incident: {i.title}</span>
-                <button type="button" className="btn btn-small" onClick={() => restore(`/incidents/${i.id}/restore`, 'Incident')}>
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  onClick={() => restore(`/incidents/${i.id}/restore`, 'Incident')}
+                >
                   Restore<span className="visually-hidden"> {i.title}</span>
                 </button>
               </li>
@@ -951,9 +1395,16 @@ export function StoragePage() {
             {trash.data.attachments.map((a) => (
               <li key={a.id} className="row" style={{ justifyContent: 'space-between' }}>
                 <span>
-                  Attachment: {a.filename} <span className="small muted">— removed permanently {a.purgeAfter ? formatDate(a.purgeAfter) : 'later'}</span>
+                  Attachment: {a.filename}{' '}
+                  <span className="small muted">
+                    — removed permanently {a.purgeAfter ? formatDate(a.purgeAfter) : 'later'}
+                  </span>
                 </span>
-                <button type="button" className="btn btn-small" onClick={() => restore(`/attachments/${a.id}/restore`, 'Attachment')}>
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  onClick={() => restore(`/attachments/${a.id}/restore`, 'Attachment')}
+                >
                   Restore<span className="visually-hidden"> {a.filename}</span>
                 </button>
               </li>
@@ -961,7 +1412,11 @@ export function StoragePage() {
             {trash.data.actors.map((a) => (
               <li key={a.id} className="row" style={{ justifyContent: 'space-between' }}>
                 <span>Actor: {a.name}</span>
-                <button type="button" className="btn btn-small" onClick={() => restore(`/actors/${a.id}/restore`, 'Actor')}>
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  onClick={() => restore(`/actors/${a.id}/restore`, 'Actor')}
+                >
                   Restore<span className="visually-hidden"> {a.name}</span>
                 </button>
               </li>
@@ -981,7 +1436,10 @@ export function ExportPage() {
   const allowed = record.data?.capabilities.export;
   return (
     <>
-      <PageHeader title="Export your data" lede="Your record belongs to you. Download a complete copy at any time." />
+      <PageHeader
+        title="Export your data"
+        lede="Your record belongs to you. Download a complete copy at any time."
+      />
       <section className="card">
         <p>The export is a ZIP file containing:</p>
         <ul>
@@ -992,7 +1450,11 @@ export function ExportPage() {
           <li>a README explaining the files, and a readable timeline</li>
         </ul>
         <p className="small muted">No OpenRampart software is needed to read it.</p>
-        {record.data?.role === 'helper' ? <Alert kind="info">This export contains only what {record.data.ownerName} has shared with you for export.</Alert> : null}
+        {record.data?.role === 'helper' ? (
+          <Alert kind="info">
+            This export contains only what {record.data.ownerName} has shared with you for export.
+          </Alert>
+        ) : null}
         {allowed ? (
           <a className="btn btn-primary" href={apiUrl('/export')} download>
             <Icon name="download" /> Download export
@@ -1028,14 +1490,28 @@ export function SystemPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const { state } = useAuth();
-  const sys = useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('/settings/admin/system') });
-  const users = useQuery({ queryKey: ['admin-users'], queryFn: () => api<{ items: AdminUser[] }>('/settings/admin/users') });
-  const types = useQuery({ queryKey: ['event-types'], queryFn: () => api<{ items: { id: string; key: string; label: string; isBuiltin: boolean; archived: boolean }[] }>('/event-types') });
+  const sys = useQuery({
+    queryKey: ['system'],
+    queryFn: () => api<SystemInfo>('/settings/admin/system'),
+  });
+  const users = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => api<{ items: AdminUser[] }>('/settings/admin/users'),
+  });
+  const types = useQuery({
+    queryKey: ['event-types'],
+    queryFn: () =>
+      api<{
+        items: { id: string; key: string; label: string; isBuiltin: boolean; archived: boolean }[];
+      }>('/event-types'),
+  });
   const [newKey, setNewKey] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [testTo, setTestTo] = useState(state?.user?.email ?? '');
   const [error, setError] = useState<unknown>(null);
-  const [confirm, setConfirm] = useState<{ user: AdminUser; action: string; label: string } | null>(null);
+  const [confirm, setConfirm] = useState<{ user: AdminUser; action: string; label: string } | null>(
+    null,
+  );
   if (!state?.user?.isAdmin) return <Alert kind="warning">Administrators only.</Alert>;
   return (
     <>
@@ -1049,7 +1525,10 @@ export function SystemPage() {
               label="Who can create accounts?"
               value={sys.data.settings.registrationMode}
               onChange={async (v) => {
-                await api('/settings/admin/settings', { method: 'PATCH', body: { registrationMode: v } });
+                await api('/settings/admin/settings', {
+                  method: 'PATCH',
+                  body: { registrationMode: v },
+                });
                 await qc.invalidateQueries({ queryKey: ['system'] });
                 toast('Registration setting saved');
               }}
@@ -1075,7 +1554,15 @@ export function SystemPage() {
             <h2>Document tools</h2>
             <ul className="plain-list">
               {Object.entries(sys.data.tools).map(([k, v]) => (
-                <li key={k}>{v ? <StatusLine ok>{k} {v}</StatusLine> : <StatusLine>{k} not found</StatusLine>}</li>
+                <li key={k}>
+                  {v ? (
+                    <StatusLine ok>
+                      {k} {v}
+                    </StatusLine>
+                  ) : (
+                    <StatusLine>{k} not found</StatusLine>
+                  )}
+                </li>
               ))}
             </ul>
           </section>
@@ -1094,7 +1581,12 @@ export function SystemPage() {
                 }
               }}
             >
-              <TextField label="Send a test email to" type="email" value={testTo} onChange={setTestTo} />
+              <TextField
+                label="Send a test email to"
+                type="email"
+                value={testTo}
+                onChange={setTestTo}
+              />
               <button className="btn" type="submit">
                 Send test email
               </button>
@@ -1120,7 +1612,8 @@ export function SystemPage() {
             {users.data?.items.map((u) => (
               <tr key={u.id}>
                 <th scope="row">
-                  {u.displayName} <span className="muted small">({u.username})</span> {u.isAdmin ? <span className="badge">Administrator</span> : null}
+                  {u.displayName} <span className="muted small">({u.username})</span>{' '}
+                  {u.isAdmin ? <span className="badge">Administrator</span> : null}
                 </th>
                 <td>{u.totpEnabledAt ? 'Set up' : 'Not set up'}</td>
                 <td>{formatDateTime(u.lastLoginAt)}</td>
@@ -1128,15 +1621,45 @@ export function SystemPage() {
                 <td>
                   {u.id !== state.user!.id ? (
                     <div className="row">
-                      <button type="button" className="btn btn-small" onClick={() => setConfirm({ user: u, action: u.disabledAt ? 'enable' : 'disable', label: u.disabledAt ? 'Enable account' : 'Disable account' })}>
+                      <button
+                        type="button"
+                        className="btn btn-small"
+                        onClick={() =>
+                          setConfirm({
+                            user: u,
+                            action: u.disabledAt ? 'enable' : 'disable',
+                            label: u.disabledAt ? 'Enable account' : 'Disable account',
+                          })
+                        }
+                      >
                         {u.disabledAt ? 'Enable' : 'Disable'}
                       </button>
                       {u.totpEnabledAt ? (
-                        <button type="button" className="btn btn-small" onClick={() => setConfirm({ user: u, action: 'reset-totp', label: 'Reset two-step sign-in' })}>
+                        <button
+                          type="button"
+                          className="btn btn-small"
+                          onClick={() =>
+                            setConfirm({
+                              user: u,
+                              action: 'reset-totp',
+                              label: 'Reset two-step sign-in',
+                            })
+                          }
+                        >
                           Reset two-step
                         </button>
                       ) : null}
-                      <button type="button" className="btn btn-small" onClick={() => setConfirm({ user: u, action: u.isAdmin ? 'remove-admin' : 'make-admin', label: u.isAdmin ? 'Remove administrator' : 'Make administrator' })}>
+                      <button
+                        type="button"
+                        className="btn btn-small"
+                        onClick={() =>
+                          setConfirm({
+                            user: u,
+                            action: u.isAdmin ? 'remove-admin' : 'make-admin',
+                            label: u.isAdmin ? 'Remove administrator' : 'Make administrator',
+                          })
+                        }
+                      >
                         {u.isAdmin ? 'Remove admin' : 'Make admin'}
                       </button>
                     </div>
@@ -1149,19 +1672,26 @@ export function SystemPage() {
           </tbody>
         </table>
       </div>
-      <p className="small muted">Administrators manage the server. They cannot see other people’s records through the interface.</p>
+      <p className="small muted">
+        Administrators manage the server. They cannot see other people’s records through the
+        interface.
+      </p>
       <h2>Event types</h2>
       <ul className="plain-list">
         {types.data?.items.map((t) => (
           <li key={t.id} className="row" style={{ justifyContent: 'space-between' }}>
             <span>
-              {t.label} <span className="mono muted">{t.key}</span> {t.archived ? <span className="badge">Archived</span> : null}
+              {t.label} <span className="mono muted">{t.key}</span>{' '}
+              {t.archived ? <span className="badge">Archived</span> : null}
             </span>
             <button
               type="button"
               className="btn btn-small"
               onClick={async () => {
-                await api(`/settings/admin/event-types/${t.id}`, { method: 'PATCH', body: { archived: !t.archived } });
+                await api(`/settings/admin/event-types/${t.id}`, {
+                  method: 'PATCH',
+                  body: { archived: !t.archived },
+                });
                 await qc.invalidateQueries({ queryKey: ['event-types'] });
               }}
             >
@@ -1178,7 +1708,10 @@ export function SystemPage() {
           e.preventDefault();
           setError(null);
           try {
-            await api('/settings/admin/event-types', { method: 'POST', body: { key: newKey, label: newLabel } });
+            await api('/settings/admin/event-types', {
+              method: 'POST',
+              body: { key: newKey, label: newLabel },
+            });
             setNewKey('');
             setNewLabel('');
             await qc.invalidateQueries({ queryKey: ['event-types'] });
@@ -1189,8 +1722,18 @@ export function SystemPage() {
         }}
       >
         <h3 style={{ marginTop: 0 }}>Add an Event type</h3>
-        <TextField label="Label" value={newLabel} onChange={setNewLabel} hint="For example “Court hearing”." />
-        <TextField label="Key" value={newKey} onChange={(v) => setNewKey(v.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} hint="Lower-case identifier used in exports and MCP, e.g. court_hearing." />
+        <TextField
+          label="Label"
+          value={newLabel}
+          onChange={setNewLabel}
+          hint="For example “Court hearing”."
+        />
+        <TextField
+          label="Key"
+          value={newKey}
+          onChange={(v) => setNewKey(v.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
+          hint="Lower-case identifier used in exports and MCP, e.g. court_hearing."
+        />
         <button className="btn" type="submit">
           Add type
         </button>
@@ -1198,12 +1741,18 @@ export function SystemPage() {
       <ConfirmDialog
         open={Boolean(confirm)}
         title={`${confirm?.label}?`}
-        body={<p>This affects {confirm?.user.displayName}’s account and is recorded in the Audit Log.</p>}
+        body={
+          <p>
+            This affects {confirm?.user.displayName}’s account and is recorded in the Audit Log.
+          </p>
+        }
         confirmLabel={confirm?.label ?? 'Confirm'}
         danger={confirm?.action === 'disable' || confirm?.action === 'reset-totp'}
         onClose={() => setConfirm(null)}
         onConfirm={async () => {
-          await api(`/settings/admin/users/${confirm!.user.id}/${confirm!.action}`, { method: 'POST' });
+          await api(`/settings/admin/users/${confirm!.user.id}/${confirm!.action}`, {
+            method: 'POST',
+          });
           setConfirm(null);
           await qc.invalidateQueries({ queryKey: ['admin-users'] });
         }}

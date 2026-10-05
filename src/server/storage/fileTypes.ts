@@ -41,8 +41,14 @@ const BINARY_TYPES: Record<string, Allowed> = {
   'audio/amr': { category: 'audio', inline: false },
   'audio/webm': { category: 'audio', inline: true },
   'video/webm': { category: 'audio', inline: false },
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { category: 'office', inline: false },
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { category: 'office', inline: false },
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
+    category: 'office',
+    inline: false,
+  },
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+    category: 'office',
+    inline: false,
+  },
   'application/vnd.oasis.opendocument.text': { category: 'office', inline: false },
   'application/vnd.oasis.opendocument.spreadsheet': { category: 'office', inline: false },
   'application/msword': { category: 'office', inline: false },
@@ -81,7 +87,10 @@ function looksLikeText(buf: Buffer): boolean {
   return replacement < Math.max(4, text.length / 200);
 }
 
-export async function detectFileType(filePath: string, originalFilename: string): Promise<DetectedType> {
+export async function detectFileType(
+  filePath: string,
+  originalFilename: string,
+): Promise<DetectedType> {
   const handle = await open(filePath, 'r');
   let head: Buffer;
   try {
@@ -98,12 +107,15 @@ export async function detectFileType(filePath: string, originalFilename: string)
     // Old Office documents are detected as generic CFB containers.
     if (mime === 'application/x-cfb') {
       const ext = path.extname(originalFilename).toLowerCase();
-      if (ext !== '.doc' && ext !== '.xls') throw new UnsupportedFileError('This file type is not supported.');
+      if (ext !== '.doc' && ext !== '.xls')
+        throw new UnsupportedFileError('This file type is not supported.');
       mime = ext === '.doc' ? 'application/msword' : 'application/vnd.ms-excel';
       return { mimeType: mime, category: 'office', inline: false };
     }
     if (mime === 'application/zip') {
-      throw new UnsupportedFileError('ZIP archives are not accepted. Please upload the individual files.');
+      throw new UnsupportedFileError(
+        'ZIP archives are not accepted. Please upload the individual files.',
+      );
     }
     const allowed = BINARY_TYPES[mime];
     if (!allowed) throw new UnsupportedFileError(`Files of type ${mime} are not accepted.`);
@@ -111,7 +123,8 @@ export async function detectFileType(filePath: string, originalFilename: string)
   }
   const ext = path.extname(originalFilename).toLowerCase();
   const textMime = TEXT_EXTENSIONS[ext];
-  if (textMime && looksLikeText(head)) return { mimeType: textMime, category: 'text', inline: textMime === 'text/plain' };
+  if (textMime && looksLikeText(head))
+    return { mimeType: textMime, category: 'text', inline: textMime === 'text/plain' };
   throw new UnsupportedFileError(
     'This file type is not accepted. Supported: photos (JPEG, PNG, HEIC, WebP), PDF, plain text, email (.eml), audio and office documents.',
   );
@@ -135,7 +148,10 @@ export function categoryOf(mimeType: string): FileCategory | null {
  */
 export function sanitiseFilename(name: string): string {
   let base = name.split(/[\\/]/).pop() ?? '';
-  base = base.normalize('NFC').replace(/[\u0000-\u001f\u007f<>:"|?*]/g, '').trim();
+  // Strip control characters and characters that are unsafe in filenames on common platforms.
+  // eslint-disable-next-line no-control-regex
+  const unsafe = /[\u0000-\u001f\u007f<>:"|?*]/g;
+  base = base.normalize('NFC').replace(unsafe, '').trim();
   base = base.replace(/^\.+/, '');
   if (!base) base = 'upload';
   if (base.length > 200) {

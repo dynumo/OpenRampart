@@ -61,7 +61,8 @@ export function hasScope(ctx: AccessContext, scope: OAuthScope): boolean {
 }
 
 export function requireOwner(ctx: AccessContext, message?: string): void {
-  if (!isOwner(ctx)) throw new ForbiddenError(message ?? 'Only the owner of this record can do that');
+  if (!isOwner(ctx))
+    throw new ForbiddenError(message ?? 'Only the owner of this record can do that');
 }
 
 export function canAddAnything(ctx: AccessContext): boolean {
@@ -83,6 +84,9 @@ export function systemContext(ownerId: string, timezone = 'Europe/London'): Acce
   };
 }
 
-export function withOAuth(ctx: AccessContext, oauth: { clientId: string; grantId: string; scopes: string[] }): AccessContext {
+export function withOAuth(
+  ctx: AccessContext,
+  oauth: { clientId: string; grantId: string; scopes: string[] },
+): AccessContext {
   return { ...ctx, via: 'mcp', oauth: { ...oauth, scopes: expandScopes(oauth.scopes) } };
 }

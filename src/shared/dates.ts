@@ -25,7 +25,14 @@ function partsInZone(instant: Date, timeZone: string) {
   for (const p of fmt.formatToParts(instant)) {
     if (p.type !== 'literal') out[p.type] = Number(p.value);
   }
-  return out as { year: number; month: number; day: number; hour: number; minute: number; second: number };
+  return out as {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+  };
 }
 
 /** Offset of `timeZone` from UTC at `instant`, in milliseconds. */
@@ -126,6 +133,13 @@ export function formatOccurrence(
   const opts: Intl.DateTimeFormatOptions =
     precision === 'date'
       ? { timeZone, day: 'numeric', month: 'long', year: 'numeric' }
-      : { timeZone, day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+      : {
+          timeZone,
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        };
   return new Intl.DateTimeFormat(locale, opts).format(d);
 }

@@ -16,7 +16,11 @@ import { runMaintenance } from './jobs/maintenance.js';
  *   node dist/server/cli.js maintenance
  */
 async function findUser(username: string) {
-  const [u] = await db().select().from(users).where(sql`lower(${users.username}) = lower(${username})`).limit(1);
+  const [u] = await db()
+    .select()
+    .from(users)
+    .where(sql`lower(${users.username}) = lower(${username})`)
+    .limit(1);
   if (!u) throw new Error(`No account named ${username}`);
   return u;
 }
@@ -32,23 +36,44 @@ async function main() {
     case 'create-admin': {
       const [username, ...name] = args;
       const password = process.env.OPENRAMPART_PASSWORD;
-      if (!username || !password) throw new Error('Usage: OPENRAMPART_PASSWORD=... cli.js create-admin <username> <display name>');
-      const u = await createAccount({ username, displayName: name.join(' ') || username, password }, { ip: 'cli' }, { forceAdmin: true });
-      console.log(`Created administrator ${u.username}. Two-step sign-in will be set up at first sign-in.`);
+      if (!username || !password)
+        throw new Error(
+          'Usage: OPENRAMPART_PASSWORD=... cli.js create-admin <username> <display name>',
+        );
+      const u = await createAccount(
+        { username, displayName: name.join(' ') || username, password },
+        { ip: 'cli' },
+        { forceAdmin: true },
+      );
+      console.log(
+        `Created administrator ${u.username}. Two-step sign-in will be set up at first sign-in.`,
+      );
       break;
     }
     case 'reset-totp': {
       const u = await findUser(args[0] ?? '');
       await adminResetTotp({ ...u, isAdmin: true }, u.id, { ip: 'cli' });
-      console.log(`Two-step sign-in reset for ${u.username}; they will enrol again at next sign-in.`);
+      console.log(
+        `Two-step sign-in reset for ${u.username}; they will enrol again at next sign-in.`,
+      );
       break;
     }
     case 'disable':
     case 'enable': {
       const u = await findUser(args[0] ?? '');
-      await db().update(users).set({ disabledAt: command === 'disable' ? new Date() : null }).where(eq(users.id, u.id));
+      await db()
+        .update(users)
+        .set({ disabledAt: command === 'disable' ? new Date() : null })
+        .where(eq(users.id, u.id));
       if (command === 'disable') await revokeAllSessions(u.id, 'disabled_by_cli');
-      await audit({ action: 'admin.action', ownerId: u.id, via: 'cli', targetType: 'user', targetId: u.id, metadata: { operation: `${command}_account` } });
+      await audit({
+        action: 'admin.action',
+        ownerId: u.id,
+        via: 'cli',
+        targetType: 'user',
+        targetId: u.id,
+        metadata: { operation: `${command}_account` },
+      });
       console.log(`${command === 'disable' ? 'Disabled' : 'Enabled'} ${u.username}.`);
       break;
     }
@@ -56,7 +81,9 @@ async function main() {
       console.log(await runMaintenance());
       break;
     default:
-      console.log('Commands: migrate | create-admin <username> <name> | reset-totp <username> | disable <username> | enable <username> | maintenance');
+      console.log(
+        'Commands: migrate | create-admin <username> <name> | reset-totp <username> | disable <username> | enable <username> | maintenance',
+      );
   }
 }
 

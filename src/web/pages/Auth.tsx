@@ -43,7 +43,8 @@ export function LoginPage() {
 
   useEffect(() => {
     if (state?.stage === 'active') navigate(returnTo, { replace: true });
-    if (state?.stage === 'totp_setup') navigate(`/setup/authenticator?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
+    if (state?.stage === 'totp_setup')
+      navigate(`/setup/authenticator?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
   }, [state?.stage, navigate, returnTo]);
 
   async function submitPassword(e: FormEvent) {
@@ -66,8 +67,12 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ usedRecoveryCode: boolean; remainingRecoveryCodes: number | null }>('/auth/mfa', { method: 'POST', body: { code } });
-      if (r.usedRecoveryCode) setNotice(`You used a recovery code. ${r.remainingRecoveryCodes} remain.`);
+      const r = await api<{ usedRecoveryCode: boolean; remainingRecoveryCodes: number | null }>(
+        '/auth/mfa',
+        { method: 'POST', body: { code } },
+      );
+      if (r.usedRecoveryCode)
+        setNotice(`You used a recovery code. ${r.remainingRecoveryCodes} remain.`);
       await refresh();
     } catch (err) {
       setError(err);
@@ -77,7 +82,12 @@ export function LoginPage() {
     }
   }
 
-  if (!state) return <AuthShell title="Sign in"><Loading /></AuthShell>;
+  if (!state)
+    return (
+      <AuthShell title="Sign in">
+        <Loading />
+      </AuthShell>
+    );
 
   if (state.stage === 'mfa') {
     return (
@@ -119,11 +129,30 @@ export function LoginPage() {
 
   return (
     <AuthShell title="Sign in">
-      {params.get('reset') ? <Alert kind="success">Your password has been changed. Sign in with your new password.</Alert> : null}
+      {params.get('reset') ? (
+        <Alert kind="success">
+          Your password has been changed. Sign in with your new password.
+        </Alert>
+      ) : null}
       <ErrorSummary error={error} />
       <form onSubmit={submitPassword} noValidate>
-        <TextField label="Username or email" value={login} onChange={setLogin} autoComplete="username" error={fieldError(error, 'login')} autoFocus spellCheck={false} />
-        <TextField label="Password" type="password" value={password} onChange={setPassword} autoComplete="current-password" error={fieldError(error, 'password')} />
+        <TextField
+          label="Username or email"
+          value={login}
+          onChange={setLogin}
+          autoComplete="username"
+          error={fieldError(error, 'login')}
+          autoFocus
+          spellCheck={false}
+        />
+        <TextField
+          label="Password"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
+          error={fieldError(error, 'password')}
+        />
         <button className="btn btn-primary" type="submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Continue'}
         </button>
@@ -136,7 +165,11 @@ export function LoginPage() {
         ) : null}
         {state.registration.open ? (
           <li>
-            <Link to="/register">{state.registration.firstUser ? 'Set up OpenRampart (create the first account)' : 'Create an account'}</Link>
+            <Link to="/register">
+              {state.registration.firstUser
+                ? 'Set up OpenRampart (create the first account)'
+                : 'Create an account'}
+            </Link>
           </li>
         ) : null}
       </ul>
@@ -144,7 +177,25 @@ export function LoginPage() {
   );
 }
 
-export function AccountForm({ onSubmit, busy, error, submitLabel, intro }: { onSubmit: (v: { username: string; displayName: string; email: string; password: string; timezone: string }) => void; busy: boolean; error: unknown; submitLabel: string; intro?: ReactNode }) {
+export function AccountForm({
+  onSubmit,
+  busy,
+  error,
+  submitLabel,
+  intro,
+}: {
+  onSubmit: (v: {
+    username: string;
+    displayName: string;
+    email: string;
+    password: string;
+    timezone: string;
+  }) => void;
+  busy: boolean;
+  error: unknown;
+  submitLabel: string;
+  intro?: ReactNode;
+}) {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -167,12 +218,53 @@ export function AccountForm({ onSubmit, busy, error, submitLabel, intro }: { onS
     >
       {intro}
       <ErrorSummary error={error} />
-      <TextField label="Your name" hint="How you would like to be shown, for example to people helping you." value={displayName} onChange={setDisplayName} autoComplete="name" error={fieldError(error, 'displayName')} />
-      <TextField label="Username" hint="Letters, numbers, dots, hyphens or underscores." value={username} onChange={setUsername} autoComplete="username" error={fieldError(error, 'username')} spellCheck={false} />
-      <TextField label="Email" type="email" optional hint="Used for account recovery and security notices. Never shared." value={email} onChange={setEmail} autoComplete="email" error={fieldError(error, 'email')} />
-      <TextField label="Password" type="password" hint="At least 12 characters. A phrase of several unrelated words works well." value={password} onChange={setPassword} autoComplete="new-password" error={fieldError(error, 'password')} />
-      <TextField label="Confirm password" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" error={mismatch ? 'The passwords do not match.' : undefined} />
-      <p className="small muted">Your time zone is set to {timezone}. You can change it later in Settings.</p>
+      <TextField
+        label="Your name"
+        hint="How you would like to be shown, for example to people helping you."
+        value={displayName}
+        onChange={setDisplayName}
+        autoComplete="name"
+        error={fieldError(error, 'displayName')}
+      />
+      <TextField
+        label="Username"
+        hint="Letters, numbers, dots, hyphens or underscores."
+        value={username}
+        onChange={setUsername}
+        autoComplete="username"
+        error={fieldError(error, 'username')}
+        spellCheck={false}
+      />
+      <TextField
+        label="Email"
+        type="email"
+        optional
+        hint="Used for account recovery and security notices. Never shared."
+        value={email}
+        onChange={setEmail}
+        autoComplete="email"
+        error={fieldError(error, 'email')}
+      />
+      <TextField
+        label="Password"
+        type="password"
+        hint="At least 12 characters. A phrase of several unrelated words works well."
+        value={password}
+        onChange={setPassword}
+        autoComplete="new-password"
+        error={fieldError(error, 'password')}
+      />
+      <TextField
+        label="Confirm password"
+        type="password"
+        value={confirm}
+        onChange={setConfirm}
+        autoComplete="new-password"
+        error={mismatch ? 'The passwords do not match.' : undefined}
+      />
+      <p className="small muted">
+        Your time zone is set to {timezone}. You can change it later in Settings.
+      </p>
       <button className="btn btn-primary" type="submit" disabled={busy}>
         {busy ? 'Creating account…' : submitLabel}
       </button>
@@ -185,11 +277,19 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  if (!state) return <AuthShell title="Create an account"><Loading /></AuthShell>;
+  if (!state)
+    return (
+      <AuthShell title="Create an account">
+        <Loading />
+      </AuthShell>
+    );
   if (!state.registration.open) {
     return (
       <AuthShell title="Create an account">
-        <p>New accounts on this server can only be created with an invitation. If someone has invited you to help them, use the link in their invitation.</p>
+        <p>
+          New accounts on this server can only be created with an invitation. If someone has invited
+          you to help them, use the link in their invitation.
+        </p>
         <p>
           <Link to="/login">Sign in</Link>
         </p>
@@ -198,7 +298,11 @@ export function RegisterPage() {
   }
   return (
     <AuthShell title={state.registration.firstUser ? 'Set up OpenRampart' : 'Create an account'}>
-      {state.registration.firstUser ? <Alert kind="info">This is the first account on this server, so it will also be the administrator.</Alert> : null}
+      {state.registration.firstUser ? (
+        <Alert kind="info">
+          This is the first account on this server, so it will also be the administrator.
+        </Alert>
+      ) : null}
       <AccountForm
         busy={busy}
         error={error}
@@ -233,13 +337,21 @@ export function RecoveryCodesList({ codes }: { codes: string[] }) {
         ))}
       </ol>
       <div className="row no-print">
-        <button type="button" className="btn" onClick={() => void navigator.clipboard?.writeText(codes.join('\n'))}>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void navigator.clipboard?.writeText(codes.join('\n'))}
+        >
           Copy codes
         </button>
         <button type="button" className="btn" onClick={() => window.print()}>
           Print codes
         </button>
-        <a className="btn" href={`data:text/plain;charset=utf-8,${encodeURIComponent(`OpenRampart recovery codes\nEach code works once.\n\n${codes.join('\n')}\n`)}`} download="openrampart-recovery-codes.txt">
+        <a
+          className="btn"
+          href={`data:text/plain;charset=utf-8,${encodeURIComponent(`OpenRampart recovery codes\nEach code works once.\n\n${codes.join('\n')}\n`)}`}
+          download="openrampart-recovery-codes.txt"
+        >
           Download codes
         </a>
       </div>
@@ -249,7 +361,9 @@ export function RecoveryCodesList({ codes }: { codes: string[] }) {
 
 /** TOTP enrolment: QR code, manual secret, confirmation, recovery codes. */
 export function TotpEnrolment({ onDone, replacing }: { onDone: () => void; replacing?: boolean }) {
-  const [setup, setSetup] = useState<{ qrSvg: string; secretDisplay: string; uri: string } | null>(null);
+  const [setup, setSetup] = useState<{ qrSvg: string; secretDisplay: string; uri: string } | null>(
+    null,
+  );
   const [code, setCode] = useState('');
   const [currentCode, setCurrentCode] = useState('');
   const [error, setError] = useState<unknown>(null);
@@ -257,7 +371,9 @@ export function TotpEnrolment({ onDone, replacing }: { onDone: () => void; repla
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
-    api<{ qrSvg: string; secretDisplay: string; uri: string }>('/auth/totp/begin', { method: 'POST' }).then(setSetup, setError);
+    api<{ qrSvg: string; secretDisplay: string; uri: string }>('/auth/totp/begin', {
+      method: 'POST',
+    }).then(setSetup, setError);
   }, []);
   if (codes) {
     return (
@@ -266,10 +382,19 @@ export function TotpEnrolment({ onDone, replacing }: { onDone: () => void; repla
           From now on you will enter a code from the app when you sign in.
         </Alert>
         <h2>Save your recovery codes</h2>
-        <p>If you lose your phone, each of these codes lets you sign in once. Keep them somewhere safe and private, such as printed in a drawer or in a password manager. They will not be shown again.</p>
+        <p>
+          If you lose your phone, each of these codes lets you sign in once. Keep them somewhere
+          safe and private, such as printed in a drawer or in a password manager. They will not be
+          shown again.
+        </p>
         <RecoveryCodesList codes={codes} />
         <div className="choice">
-          <input id="saved-codes" type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
+          <input
+            id="saved-codes"
+            type="checkbox"
+            checked={saved}
+            onChange={(e) => setSaved(e.target.checked)}
+          />
           <label htmlFor="saved-codes">I have saved my recovery codes</label>
         </div>
         <button type="button" className="btn btn-primary" disabled={!saved} onClick={onDone}>
@@ -282,14 +407,23 @@ export function TotpEnrolment({ onDone, replacing }: { onDone: () => void; repla
     <div className="stack">
       <ErrorSummary error={error} />
       <ol>
-        <li>Install an authenticator app on your phone if you do not have one (for example the one built into your password manager, or Google Authenticator, Microsoft Authenticator, 2FAS or Aegis).</li>
+        <li>
+          Install an authenticator app on your phone if you do not have one (for example the one
+          built into your password manager, or Google Authenticator, Microsoft Authenticator, 2FAS
+          or Aegis).
+        </li>
         <li>In the app, add an account and scan this QR code.</li>
         <li>Enter the 6-digit code the app shows.</li>
       </ol>
       {setup ? (
         <>
           {/* The QR SVG is generated by the server from a fixed template, not user content. */}
-          <div className="qr" role="img" aria-label="QR code for your authenticator app. If you cannot scan it, use the setup key below." dangerouslySetInnerHTML={{ __html: setup.qrSvg }} />
+          <div
+            className="qr"
+            role="img"
+            aria-label="QR code for your authenticator app. If you cannot scan it, use the setup key below."
+            dangerouslySetInnerHTML={{ __html: setup.qrSvg }}
+          />
           <details>
             <summary>Cannot scan the code? Enter the setup key instead</summary>
             <p>
@@ -308,7 +442,10 @@ export function TotpEnrolment({ onDone, replacing }: { onDone: () => void; repla
           setBusy(true);
           setError(null);
           try {
-            const r = await api<{ recoveryCodes: string[] }>('/auth/totp/confirm', { method: 'POST', body: { code, currentCode: replacing ? currentCode : undefined } });
+            const r = await api<{ recoveryCodes: string[] }>('/auth/totp/confirm', {
+              method: 'POST',
+              body: { code, currentCode: replacing ? currentCode : undefined },
+            });
             setCodes(r.recoveryCodes);
           } catch (err) {
             setError(err);
@@ -317,8 +454,26 @@ export function TotpEnrolment({ onDone, replacing }: { onDone: () => void; repla
           }
         }}
       >
-        {replacing ? <TextField label="Code from your current authenticator" value={currentCode} onChange={setCurrentCode} autoComplete="one-time-code" inputMode="numeric" className="input-code" error={fieldError(error, 'currentCode')} /> : null}
-        <TextField label={replacing ? 'Code from the new authenticator' : 'Code from the app'} value={code} onChange={setCode} autoComplete="one-time-code" inputMode="numeric" className="input-code" error={fieldError(error, 'code')} />
+        {replacing ? (
+          <TextField
+            label="Code from your current authenticator"
+            value={currentCode}
+            onChange={setCurrentCode}
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            className="input-code"
+            error={fieldError(error, 'currentCode')}
+          />
+        ) : null}
+        <TextField
+          label={replacing ? 'Code from the new authenticator' : 'Code from the app'}
+          value={code}
+          onChange={setCode}
+          autoComplete="one-time-code"
+          inputMode="numeric"
+          className="input-code"
+          error={fieldError(error, 'code')}
+        />
         <button className="btn btn-primary" type="submit" disabled={busy || !setup}>
           {busy ? 'Checking…' : 'Confirm'}
         </button>
@@ -333,7 +488,10 @@ export function SetupAuthenticatorPage() {
   const [params] = useSearchParams();
   return (
     <AuthShell title="Set up two-step sign-in">
-      <p>Your record holds personal information, so OpenRampart asks for a code from an authenticator app as well as your password.</p>
+      <p>
+        Your record holds personal information, so OpenRampart asks for a code from an authenticator
+        app as well as your password.
+      </p>
       <TotpEnrolment
         onDone={async () => {
           await refresh();
@@ -363,7 +521,10 @@ export function ResetPasswordPage() {
             setBusy(true);
             setError(null);
             try {
-              await api('/auth/password-reset/complete', { method: 'POST', body: { token, password } });
+              await api('/auth/password-reset/complete', {
+                method: 'POST',
+                body: { token, password },
+              });
               navigate('/login?reset=1');
             } catch (err) {
               setError(err);
@@ -372,7 +533,15 @@ export function ResetPasswordPage() {
             }
           }}
         >
-          <TextField label="New password" type="password" hint="At least 12 characters." value={password} onChange={setPassword} autoComplete="new-password" error={fieldError(error, 'password')} />
+          <TextField
+            label="New password"
+            type="password"
+            hint="At least 12 characters."
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+            error={fieldError(error, 'password')}
+          />
           <button className="btn btn-primary" type="submit" disabled={busy}>
             Save new password
           </button>
@@ -387,7 +556,8 @@ export function ResetPasswordPage() {
     <AuthShell title="Reset your password">
       {sent ? (
         <Alert kind="success" title="Check your email">
-          If an account with an email address matches, we have sent a link to reset the password. The link works once and expires in an hour.
+          If an account with an email address matches, we have sent a link to reset the password.
+          The link works once and expires in an hour.
         </Alert>
       ) : (
         <form
@@ -404,7 +574,12 @@ export function ResetPasswordPage() {
           }}
         >
           <ErrorSummary error={error} />
-          <TextField label="Username or email" value={login} onChange={setLogin} autoComplete="username" />
+          <TextField
+            label="Username or email"
+            value={login}
+            onChange={setLogin}
+            autoComplete="username"
+          />
           <button className="btn btn-primary" type="submit">
             Send reset link
           </button>
@@ -436,12 +611,25 @@ export function InvitationPage() {
   useEffect(() => {
     api<InvitationView>(`/invitations/${token}`).then(setInvite, setError);
   }, [token]);
-  if (!invite) return <AuthShell title="Invitation">{error ? <ErrorSummary error={error} /> : <Loading />}</AuthShell>;
+  if (!invite)
+    return (
+      <AuthShell title="Invitation">
+        {error ? <ErrorSummary error={error} /> : <Loading />}
+      </AuthShell>
+    );
   if (invite.state !== 'valid') {
-    const reason = { expired: 'has expired', used: 'has already been used', revoked: 'has been withdrawn', invalid: 'is not valid' }[invite.state];
+    const reason = {
+      expired: 'has expired',
+      used: 'has already been used',
+      revoked: 'has been withdrawn',
+      invalid: 'is not valid',
+    }[invite.state];
     return (
       <AuthShell title="This invitation cannot be used">
-        <p>This invitation link {reason}. Invitation links work once and expire after a few days. Ask the person who invited you to send a new one.</p>
+        <p>
+          This invitation link {reason}. Invitation links work once and expire after a few days. Ask
+          the person who invited you to send a new one.
+        </p>
         <p>
           <Link to="/login">Go to sign in</Link>
         </p>
@@ -466,7 +654,9 @@ export function InvitationPage() {
   return (
     <AuthShell title={`Help ${invite.ownerName} with their record`}>
       <p>
-        <strong>{invite.ownerName}</strong> has invited you to be a Helper (“{invite.label}”). Being a Helper lets you see, and if allowed add to, part of their OpenRampart record. It does not make you an administrator.
+        <strong>{invite.ownerName}</strong> has invited you to be a Helper (“{invite.label}”). Being
+        a Helper lets you see, and if allowed add to, part of their OpenRampart record. It does not
+        make you an administrator.
       </p>
       <div className="panel-muted">
         <p style={{ marginBottom: '0.25rem' }}>
@@ -478,13 +668,17 @@ export function InvitationPage() {
           ))}
         </ul>
         <p className="small" style={{ margin: 0 }}>
-          This invitation works once and expires on {new Date(invite.expiresAt!).toLocaleString('en-GB')}.
+          This invitation works once and expires on{' '}
+          {new Date(invite.expiresAt!).toLocaleString('en-GB')}.
         </p>
       </div>
       <ErrorSummary error={error} />
       {state?.stage === 'active' ? (
         <div className="stack" style={{ marginTop: '1rem' }}>
-          <p>You are signed in as {state.user?.displayName}. Accepting links this access to your account.</p>
+          <p>
+            You are signed in as {state.user?.displayName}. Accepting links this access to your
+            account.
+          </p>
           <button type="button" className="btn btn-primary" onClick={accept} disabled={busy}>
             <Icon name="check" />
             Accept invitation
@@ -501,7 +695,10 @@ export function InvitationPage() {
               setBusy(true);
               setError(null);
               try {
-                const r = await api<{ ownerId: string | null }>(`/invitations/${token}/register`, { method: 'POST', body: v });
+                const r = await api<{ ownerId: string | null }>(`/invitations/${token}/register`, {
+                  method: 'POST',
+                  body: v,
+                });
                 if (r.ownerId) setRecordOwner(r.ownerId);
                 await refresh();
                 navigate('/setup/authenticator');
@@ -514,7 +711,9 @@ export function InvitationPage() {
           />
           <h2>Already have an account?</h2>
           <p>
-            <Link to={`/login?returnTo=${encodeURIComponent(`/invite/${token}`)}`}>Sign in to accept</Link>
+            <Link to={`/login?returnTo=${encodeURIComponent(`/invite/${token}`)}`}>
+              Sign in to accept
+            </Link>
           </p>
         </>
       )}

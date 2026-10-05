@@ -12,17 +12,29 @@ import { registerBrowser } from './helpers.js';
 const fixture = (name: string) => path.join(__dirname, '../fixtures/documents', name);
 
 async function newEvent(b: Awaited<ReturnType<typeof registerBrowser>>) {
-  const res = await b.agent.post('/api/events').set('X-CSRF-Token', b.csrf).send({ typeId: 'letter_in', occurredAt: '2026-09-12' }).expect(201);
+  const res = await b.agent
+    .post('/api/events')
+    .set('X-CSRF-Token', b.csrf)
+    .send({ typeId: 'letter_in', occurredAt: '2026-09-12' })
+    .expect(201);
   return res.body.id as string;
 }
 
 describe('Attachments, originals and OCR', () => {
   it('stores the original byte-for-byte with its SHA-256 and runs OCR asynchronously', async () => {
     const b = await registerBrowser();
-    const hmrc = await b.agent.post('/api/actors').set('X-CSRF-Token', b.csrf).send({ name: 'HM Revenue and Customs' }).expect(201);
+    const hmrc = await b.agent
+      .post('/api/actors')
+      .set('X-CSRF-Token', b.csrf)
+      .send({ name: 'HM Revenue and Customs' })
+      .expect(201);
     const eventId = await newEvent(b);
     const bytes = readFileSync(fixture('letter.png'));
-    const up = await b.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', b.csrf).attach('file', bytes, { filename: 'page-1.png', contentType: 'application/octet-stream' }).expect(201);
+    const up = await b.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', b.csrf)
+      .attach('file', bytes, { filename: 'page-1.png', contentType: 'application/octet-stream' })
+      .expect(201);
     expect(up.body.mimeType).toBe('image/png'); // detected from content, not the declared type
     expect(up.body.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
     expect(up.body.ocrStatus).toBe('pending');
@@ -41,11 +53,15 @@ describe('Attachments, originals and OCR', () => {
     expect((await getObjectBuffer(row!.storageKey)).equals(bytes)).toBe(true);
     const thumb = await b.agent.get(`/api/attachments/${up.body.id}/thumbnail`).expect(200);
     expect(thumb.headers['content-type']).toBe('image/webp');
-    const original = await b.agent.get(`/api/attachments/${up.body.id}/original`).buffer(true).parse((res, cb) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (c: Buffer) => chunks.push(c));
-      res.on('end', () => cb(null, Buffer.concat(chunks)));
-    }).expect(200);
+    const original = await b.agent
+      .get(`/api/attachments/${up.body.id}/original`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
     expect((original.body as Buffer).equals(bytes)).toBe(true);
     expect(original.headers['content-security-policy']).toContain('sandbox');
     expect(original.headers['x-content-type-options']).toBe('nosniff');
@@ -54,14 +70,23 @@ describe('Attachments, originals and OCR', () => {
     const found = await b.agent.get('/api/search?q=penguinword').expect(200);
     expect(found.body.documents[0].attachmentId).toBe(up.body.id);
     expect(found.body.events.map((e: { id: string }) => e.id)).toContain(eventId);
-    await b.agent.put(`/api/attachments/${up.body.id}/text`).set('X-CSRF-Token', b.csrf).send({ text: 'Corrected text with ostrichword' }).expect(200);
-    expect((await b.agent.get('/api/search?q=ostrichword').expect(200)).body.totals.documents).toBe(1);
+    await b.agent
+      .put(`/api/attachments/${up.body.id}/text`)
+      .set('X-CSRF-Token', b.csrf)
+      .send({ text: 'Corrected text with ostrichword' })
+      .expect(200);
+    expect((await b.agent.get('/api/search?q=ostrichword').expect(200)).body.totals.documents).toBe(
+      1,
+    );
     const t2 = await b.agent.get(`/api/attachments/${up.body.id}/text`).expect(200);
     expect(t2.body.corrected).toBe(true);
     expect(t2.body.originalText).toContain('penguinword');
     expect((await getObjectBuffer(row!.storageKey)).equals(bytes)).toBe(true);
 
-    const verify = await b.agent.post(`/api/attachments/${up.body.id}/verify`).set('X-CSRF-Token', b.csrf).expect(200);
+    const verify = await b.agent
+      .post(`/api/attachments/${up.body.id}/verify`)
+      .set('X-CSRF-Token', b.csrf)
+      .expect(200);
     expect(verify.body.integrity.ok).toBe(true);
     // A new revision captured the attachment's hash.
     const revs = await b.agent.get(`/api/events/${eventId}/revisions`).expect(200);
@@ -71,7 +96,11 @@ describe('Attachments, originals and OCR', () => {
   it('extracts the text layer of text PDFs and OCRs scanned PDFs', async () => {
     const b = await registerBrowser();
     const eventId = await newEvent(b);
-    const textPdf = await b.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', b.csrf).attach('file', fixture('text-letter.pdf')).expect(201);
+    const textPdf = await b.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', b.csrf)
+      .attach('file', fixture('text-letter.pdf'))
+      .expect(201);
     expect(textPdf.body.mimeType).toBe('application/pdf');
     await processAttachment(textPdf.body.id);
     const t1 = (await b.agent.get(`/api/attachments/${textPdf.body.id}/text`)).body;
@@ -81,7 +110,11 @@ describe('Attachments, originals and OCR', () => {
     expect(meta.pageCount).toBe(1);
     expect(meta.hasThumbnail).toBe(true);
 
-    const scanned = await b.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', b.csrf).attach('file', fixture('scanned-letter.pdf')).expect(201);
+    const scanned = await b.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', b.csrf)
+      .attach('file', fixture('scanned-letter.pdf'))
+      .expect(201);
     await processAttachment(scanned.body.id);
     const t2 = (await b.agent.get(`/api/attachments/${scanned.body.id}/text`)).body;
     expect(t2.status).toBe('done');
@@ -93,23 +126,52 @@ describe('Attachments, originals and OCR', () => {
     const b = await registerBrowser();
     const eventId = await newEvent(b);
     for (const name of ['page 1.png', 'page 2.png', 'page 3.png']) {
-      await b.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', b.csrf).attach('file', readFileSync(fixture('letter.png')), name).expect(201);
+      await b.agent
+        .post(`/api/events/${eventId}/attachments`)
+        .set('X-CSRF-Token', b.csrf)
+        .attach('file', readFileSync(fixture('letter.png')), name)
+        .expect(201);
     }
     const e = (await b.agent.get(`/api/events/${eventId}`)).body;
-    expect(e.attachments.map((a: { originalFilename: string }) => a.originalFilename)).toEqual(['page 1.png', 'page 2.png', 'page 3.png']);
+    expect(e.attachments.map((a: { originalFilename: string }) => a.originalFilename)).toEqual([
+      'page 1.png',
+      'page 2.png',
+      'page 3.png',
+    ]);
     expect(e.attachmentCount).toBe(3);
   });
 
   it('rejects active content and disguised files', async () => {
     const b = await registerBrowser();
     const eventId = await newEvent(b);
-    const html = await b.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', b.csrf).attach('file', Buffer.from('<!doctype html><script>alert(1)</script>'), 'letter.txt');
+    const html = await b.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', b.csrf)
+      .attach('file', Buffer.from('<!doctype html><script>alert(1)</script>'), 'letter.txt');
     expect(html.status).toBe(400);
-    const svg = await b.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', b.csrf).attach('file', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), 'image.svg');
+    const svg = await b.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', b.csrf)
+      .attach(
+        'file',
+        Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
+        'image.svg',
+      );
     expect(svg.status).toBe(400);
-    const exe = await b.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', b.csrf).attach('file', Buffer.from('MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff'), 'photo.jpg');
+    const exe = await b.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', b.csrf)
+      .attach(
+        'file',
+        Buffer.from('MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff'),
+        'photo.jpg',
+      );
     expect(exe.status).toBe(400);
-    const traversal = await b.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', b.csrf).attach('file', Buffer.from('plain notes'), '../../etc/passwd.txt').expect(201);
+    const traversal = await b.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', b.csrf)
+      .attach('file', Buffer.from('plain notes'), '../../etc/passwd.txt')
+      .expect(201);
     expect(traversal.body.originalFilename).toBe('passwd.txt');
   });
 
@@ -117,11 +179,19 @@ describe('Attachments, originals and OCR', () => {
     const owner = await registerBrowser();
     const other = await registerBrowser();
     const eventId = await newEvent(owner);
-    const up = await owner.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', owner.csrf).attach('file', Buffer.from('private'), 'private.txt').expect(201);
+    const up = await owner.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', owner.csrf)
+      .attach('file', Buffer.from('private'), 'private.txt')
+      .expect(201);
     await other.agent.get(`/api/attachments/${up.body.id}`).expect(404);
     await other.agent.get(`/api/attachments/${up.body.id}/original`).expect(404);
     await other.agent.get(`/api/events/${eventId}`).expect(404);
-    await other.agent.post(`/api/events/${eventId}/attachments`).set('X-CSRF-Token', other.csrf).attach('file', Buffer.from('x'), 'x.txt').expect(404);
+    await other.agent
+      .post(`/api/events/${eventId}/attachments`)
+      .set('X-CSRF-Token', other.csrf)
+      .attach('file', Buffer.from('x'), 'x.txt')
+      .expect(404);
     // Requesting the owner's record explicitly is refused too.
     await other.agent.get('/api/events').set('X-OpenRampart-Record', owner.userId).expect(404);
   });

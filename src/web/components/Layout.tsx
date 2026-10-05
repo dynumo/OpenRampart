@@ -84,7 +84,8 @@ export function Layout() {
       {helperView ? (
         <div className="record-banner" role="note">
           <div className="record-banner__inner">
-            You are helping with <strong>{record.data?.ownerName}</strong>’s record. You can see only what they have shared with you
+            You are helping with <strong>{record.data?.ownerName}</strong>’s record. You can see
+            only what they have shared with you
             {record.data?.capabilities.add ? ', and add to it' : ''}.
           </div>
         </div>
@@ -125,11 +126,20 @@ export function Layout() {
   );
 }
 
-function RecordSwitcher(props: { current: string | null; ownName: string; shared: { ownerId: string; ownerName: string }[]; onChange: (id: string | null) => void }) {
+function RecordSwitcher(props: {
+  current: string | null;
+  ownName: string;
+  shared: { ownerId: string; ownerName: string }[];
+  onChange: (id: string | null) => void;
+}) {
   return (
     <label className="row small">
       <span>Record</span>
-      <select value={props.current ?? ''} onChange={(e) => props.onChange(e.target.value || null)} style={{ width: 'auto', minWidth: '10rem' }}>
+      <select
+        value={props.current ?? ''}
+        onChange={(e) => props.onChange(e.target.value || null)}
+        style={{ width: 'auto', minWidth: '10rem' }}
+      >
         <option value="">{props.ownName} (yours)</option>
         {props.shared.map((s) => (
           <option key={s.ownerId} value={s.ownerId}>
@@ -141,7 +151,15 @@ function RecordSwitcher(props: { current: string | null; ownName: string; shared
   );
 }
 
-export function PageHeader({ title, lede, actions }: { title: string; lede?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({
+  title,
+  lede,
+  actions,
+}: {
+  title: string;
+  lede?: ReactNode;
+  actions?: ReactNode;
+}) {
   return (
     <div className="page-header">
       <div>

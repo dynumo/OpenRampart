@@ -160,7 +160,10 @@ export const events = pgTable('events', {
   eventTypeId: uuid('event_type_id').notNull(),
   title: text('title').notNull().default(''),
   occurredAt: ts('occurred_at').notNull(),
-  occurredPrecision: text('occurred_precision').$type<'date' | 'datetime'>().notNull().default('datetime'),
+  occurredPrecision: text('occurred_precision')
+    .$type<'date' | 'datetime'>()
+    .notNull()
+    .default('datetime'),
   endedAt: ts('ended_at'),
   recordedAt: ts('recorded_at').notNull().defaultNow(),
   direction: text('direction').$type<Direction | null>(),
@@ -174,7 +177,10 @@ export const events = pgTable('events', {
   dueOn: date('due_on', { mode: 'string' }),
   revision: integer('revision').notNull().default(1),
   createdBy: uuid('created_by'),
-  createdVia: text('created_via').$type<'web' | 'mcp' | 'audit' | 'import'>().notNull().default('web'),
+  createdVia: text('created_via')
+    .$type<'web' | 'mcp' | 'audit' | 'import'>()
+    .notNull()
+    .default('web'),
   updatedBy: uuid('updated_by'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
@@ -258,7 +264,10 @@ export const attachments = pgTable('attachments', {
   height: integer('height'),
   thumbnailKey: text('thumbnail_key'),
   previewKey: text('preview_key'),
-  derivativeStatus: text('derivative_status').$type<ProcessingStatus>().notNull().default('pending'),
+  derivativeStatus: text('derivative_status')
+    .$type<ProcessingStatus>()
+    .notNull()
+    .default('pending'),
   derivativeError: text('derivative_error'),
   ocrStatus: text('ocr_status').$type<OcrStatus>().notNull().default('pending'),
   ocrText: text('ocr_text'),
@@ -347,7 +356,10 @@ export const accessGrants = pgTable('access_grants', {
   dateTo: date('date_to', { mode: 'string' }),
   canAdd: boolean('can_add').notNull().default(false),
   canExport: boolean('can_export').notNull().default(false),
-  coActorVisibility: text('co_actor_visibility').$type<'redacted' | 'name'>().notNull().default('redacted'),
+  coActorVisibility: text('co_actor_visibility')
+    .$type<'redacted' | 'name'>()
+    .notNull()
+    .default('redacted'),
   note: text('note'),
   createdBy: uuid('created_by'),
   createdAt: ts('created_at').notNull().defaultNow(),

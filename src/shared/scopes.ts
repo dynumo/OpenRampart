@@ -30,24 +30,40 @@ export const SCOPE_DESCRIPTIONS: Record<OAuthScope, { label: string; detail: str
     label: 'Add and edit Events',
     detail: 'Create Events and correct them. Every change is kept in revision history.',
   },
-  'incidents:read': { label: 'Read Incidents', detail: 'See Incidents and which Events they group.' },
+  'incidents:read': {
+    label: 'Read Incidents',
+    detail: 'See Incidents and which Events they group.',
+  },
   'incidents:write': {
     label: 'Organise Incidents',
     detail: 'Create and update Incidents and add or remove Events from them.',
   },
-  'actors:read': { label: 'Read Actors', detail: 'See the organisations and people in your record.' },
-  'actors:write': { label: 'Add and edit Actors', detail: 'Create Actors and update their details.' },
+  'actors:read': {
+    label: 'Read Actors',
+    detail: 'See the organisations and people in your record.',
+  },
+  'actors:write': {
+    label: 'Add and edit Actors',
+    detail: 'Create Actors and update their details.',
+  },
   'attachments:metadata': {
     label: 'See attachment details',
-    detail: 'See attachment file names, types, sizes, hashes and processing status — not the contents.',
+    detail:
+      'See attachment file names, types, sizes, hashes and processing status — not the contents.',
   },
   'attachments:read': {
     label: 'Read attachment contents',
     detail: 'Download original files and read their OCR text.',
   },
   'attachments:write': { label: 'Add attachments', detail: 'Upload files to Events.' },
-  'search:read': { label: 'Search your record', detail: 'Run searches across Events, Actors and Incidents.' },
-  'export:read': { label: 'Export data', detail: 'Produce a complete export of the accessible record.' },
+  'search:read': {
+    label: 'Search your record',
+    detail: 'Run searches across Events, Actors and Incidents.',
+  },
+  'export:read': {
+    label: 'Export data',
+    detail: 'Produce a complete export of the accessible record.',
+  },
 };
 
 /** Scopes that imply narrower ones. */

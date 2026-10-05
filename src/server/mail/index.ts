@@ -14,7 +14,11 @@ class LogProvider implements MailProvider {
     this.sent.push(message);
     if (this.sent.length > 100) this.sent.shift();
     if (process.env.NODE_ENV !== 'test') {
-      console.log(`\n--- email (MAIL_PROVIDER=log) to ${message.to}: ${message.subject}\n${message.text}\n---\n`);
+      // Development-only provider (refused in production by config validation).
+      // eslint-disable-next-line no-console
+      console.log(
+        `\n--- email (MAIL_PROVIDER=log) to ${message.to}: ${message.subject}\n${message.text}\n---\n`,
+      );
     }
     return {};
   }

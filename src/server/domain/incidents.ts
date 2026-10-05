@@ -98,7 +98,13 @@ function toDTO(ctx: AccessContext, r: IncidentRow): IncidentDTO {
 
 export async function listIncidents(
   ctx: AccessContext,
-  q: { status?: string[]; search?: string; limit?: number; offset?: number; deleted?: boolean } = {},
+  q: {
+    status?: string[];
+    search?: string;
+    limit?: number;
+    offset?: number;
+    deleted?: boolean;
+  } = {},
 ) {
   requireScopes(ctx, 'incidents:read');
   const where = [incidentVisible(ctx, 'i', { includeDeleted: q.deleted })];
@@ -106,8 +112,16 @@ export async function listIncidents(
     if (!isOwner(ctx)) throw new ForbiddenError();
     where.push(sql`i.deleted_at IS NOT NULL`);
   }
-  const statuses = (q.status ?? []).filter((s) => ['open', 'monitoring', 'resolved', 'closed'].includes(s));
-  if (statuses.length) where.push(sql`i.status IN (${sql.join(statuses.map((s) => sql`${s}`), sql`, `)})`);
+  const statuses = (q.status ?? []).filter((s) =>
+    ['open', 'monitoring', 'resolved', 'closed'].includes(s),
+  );
+  if (statuses.length)
+    where.push(
+      sql`i.status IN (${sql.join(
+        statuses.map((s) => sql`${s}`),
+        sql`, `,
+      )})`,
+    );
   if (q.search?.trim()) {
     const like = '%' + q.search.trim().replace(/[%_\\]/g, '\\$&') + '%';
     where.push(sql`(i.title ILIKE ${like} OR word_similarity(${q.search.trim()}, i.title) > 0.4)`);
@@ -117,11 +131,17 @@ export async function listIncidents(
     ORDER BY CASE i.status WHEN 'open' THEN 0 WHEN 'monitoring' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END,
              i.opened_on DESC, i.id
     LIMIT ${limit} OFFSET ${Math.max(q.offset ?? 0, 0)}`);
-  const [count] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM incidents i WHERE ${sql.join(where, sql` AND `)}`);
+  const [count] = await rows<{ n: number }>(
+    sql`SELECT count(*)::int AS n FROM incidents i WHERE ${sql.join(where, sql` AND `)}`,
+  );
   return { items: list.map((r) => toDTO(ctx, r)), total: count?.n ?? 0 };
 }
 
-export async function getIncident(ctx: AccessContext, id: string, opts: { includeDeleted?: boolean } = {}): Promise<IncidentDTO> {
+export async function getIncident(
+  ctx: AccessContext,
+  id: string,
+  opts: { includeDeleted?: boolean } = {},
+): Promise<IncidentDTO> {
   requireScopes(ctx, 'incidents:read');
   if (!isUuid(id)) throw new NotFoundError('Incident');
   const [row] = await rows<IncidentRow>(
@@ -135,14 +155,18 @@ export async function getIncident(ctx: AccessContext, id: string, opts: { includ
 
 function requireIncidentWrite(ctx: AccessContext) {
   requireScopes(ctx, 'incidents:write');
-  if (!isOwner(ctx)) throw new ForbiddenError('Only the owner of this record can organise Incidents');
+  if (!isOwner(ctx))
+    throw new ForbiddenError('Only the owner of this record can organise Incidents');
 }
 
 async function visibleEventIds(ctx: AccessContext, ids: string[]): Promise<string[]> {
   const clean = cleanIds(ids);
   if (!clean.length) return [];
-  const found = await rows<{ id: string }>(sql`SELECT e.id FROM events e WHERE e.id IN (${uuidList(clean)}) AND ${eventVisible(ctx, 'e')}`);
-  if (found.length !== clean.length || clean.length !== ids.length) throw new NotFoundError('Event');
+  const found = await rows<{ id: string }>(
+    sql`SELECT e.id FROM events e WHERE e.id IN (${uuidList(clean)}) AND ${eventVisible(ctx, 'e')}`,
+  );
+  if (found.length !== clean.length || clean.length !== ids.length)
+    throw new NotFoundError('Event');
   return clean;
 }
 
@@ -152,7 +176,9 @@ export async function createIncident(ctx: AccessContext, raw: unknown): Promise<
   const eventIds = await visibleEventIds(ctx, input.eventIds ?? []);
   const status = input.status ?? 'open';
   if (input.closedOn && input.openedOn && input.closedOn < input.openedOn) {
-    throw new ValidationError('The closed date must be on or after the opened date', { closedOn: 'Must be on or after the opened date.' });
+    throw new ValidationError('The closed date must be on or after the opened date', {
+      closedOn: 'Must be on or after the opened date.',
+    });
   }
   const id = await db().transaction(async (tx) => {
     let openedOn = input.openedOn;
@@ -171,16 +197,27 @@ export async function createIncident(ctx: AccessContext, raw: unknown): Promise<
         description: input.description?.trim() ?? '',
         status,
         openedOn: openedOn ?? new Date().toISOString().slice(0, 10),
-        closedOn: input.closedOn ?? (status === 'closed' || status === 'resolved' ? new Date().toISOString().slice(0, 10) : null),
+        closedOn:
+          input.closedOn ??
+          (status === 'closed' || status === 'resolved'
+            ? new Date().toISOString().slice(0, 10)
+            : null),
         impactSummary: input.impactSummary?.trim() || null,
         outcomeNotes: input.outcomeNotes?.trim() || null,
         createdBy: ctx.userId,
       })
       .returning({ id: incidents.id });
     for (const eventId of eventIds) {
-      await tx.insert(incidentEvents).values({ incidentId: created!.id, eventId, addedBy: ctx.userId });
+      await tx
+        .insert(incidentEvents)
+        .values({ incidentId: created!.id, eventId, addedBy: ctx.userId });
     }
-    await auditCtx(ctx, 'incident.created', { type: 'incident', id: created!.id, metadata: { events: eventIds.length } }, tx);
+    await auditCtx(
+      ctx,
+      'incident.created',
+      { type: 'incident', id: created!.id, metadata: { events: eventIds.length } },
+      tx,
+    );
     return created!.id;
   });
   return getIncident(ctx, id);
@@ -188,12 +225,20 @@ export async function createIncident(ctx: AccessContext, raw: unknown): Promise<
 
 async function loadOwnIncident(ctx: AccessContext, id: string, includeDeleted = false) {
   if (!isUuid(id)) throw new NotFoundError('Incident');
-  const [row] = await db().select().from(incidents).where(and(eq(incidents.id, id), eq(incidents.ownerId, ctx.ownerId))).limit(1);
+  const [row] = await db()
+    .select()
+    .from(incidents)
+    .where(and(eq(incidents.id, id), eq(incidents.ownerId, ctx.ownerId)))
+    .limit(1);
   if (!row || (row.deletedAt && !includeDeleted)) throw new NotFoundError('Incident');
   return row;
 }
 
-export async function updateIncident(ctx: AccessContext, id: string, raw: unknown): Promise<IncidentDTO> {
+export async function updateIncident(
+  ctx: AccessContext,
+  id: string,
+  raw: unknown,
+): Promise<IncidentDTO> {
   requireIncidentWrite(ctx);
   const current = await loadOwnIncident(ctx, id);
   const patch = parse(incidentPatchSchema, raw);
@@ -206,18 +251,29 @@ export async function updateIncident(ctx: AccessContext, id: string, raw: unknow
   if (patch.outcomeNotes !== undefined) set.outcomeNotes = patch.outcomeNotes?.trim() || null;
   if (patch.status !== undefined) {
     set.status = patch.status;
-    if ((patch.status === 'closed' || patch.status === 'resolved') && patch.closedOn === undefined && !current.closedOn) {
+    if (
+      (patch.status === 'closed' || patch.status === 'resolved') &&
+      patch.closedOn === undefined &&
+      !current.closedOn
+    ) {
       set.closedOn = new Date().toISOString().slice(0, 10);
     }
-    if ((patch.status === 'open' || patch.status === 'monitoring') && patch.closedOn === undefined) set.closedOn = null;
+    if ((patch.status === 'open' || patch.status === 'monitoring') && patch.closedOn === undefined)
+      set.closedOn = null;
   }
   const opened = set.openedOn ?? current.openedOn;
   const closed = set.closedOn !== undefined ? set.closedOn : current.closedOn;
   if (closed && closed < opened) {
-    throw new ValidationError('The closed date must be on or after the opened date', { closedOn: 'Must be on or after the opened date.' });
+    throw new ValidationError('The closed date must be on or after the opened date', {
+      closedOn: 'Must be on or after the opened date.',
+    });
   }
   await db().update(incidents).set(set).where(eq(incidents.id, id));
-  await auditCtx(ctx, 'incident.updated', { type: 'incident', id, metadata: { fields: Object.keys(set).filter((k) => k !== 'updatedAt') } });
+  await auditCtx(ctx, 'incident.updated', {
+    type: 'incident',
+    id,
+    metadata: { fields: Object.keys(set).filter((k) => k !== 'updatedAt') },
+  });
   return getIncident(ctx, id);
 }
 
@@ -225,21 +281,36 @@ export async function updateIncident(ctx: AccessContext, id: string, raw: unknow
  * Add Events to an Incident. Owners may add any of their Events; Helpers with
  * Add may add Events they can see to Incidents they can see (never remove).
  */
-export async function addEventsToIncident(ctx: AccessContext, incidentId: string, eventIds: string[]): Promise<number> {
+export async function addEventsToIncident(
+  ctx: AccessContext,
+  incidentId: string,
+  eventIds: string[],
+): Promise<number> {
   requireScopes(ctx, 'incidents:write');
   if (!isUuid(incidentId)) throw new NotFoundError('Incident');
   const addCtx = isOwner(ctx) ? ctx : restrictContext(ctx, 'add');
-  const [inc] = await rows<{ id: string }>(sql`SELECT i.id FROM incidents i WHERE i.id = ${incidentId}::uuid AND ${incidentVisible(addCtx, 'i')}`);
+  const [inc] = await rows<{ id: string }>(
+    sql`SELECT i.id FROM incidents i WHERE i.id = ${incidentId}::uuid AND ${incidentVisible(addCtx, 'i')}`,
+  );
   if (!inc) throw new NotFoundError('Incident');
   if (!isOwner(ctx) && !ctx.grants.some((g) => g.canAdd)) throw new ForbiddenError();
   const ids = await visibleEventIds(addCtx, eventIds);
   let added = 0;
   await db().transaction(async (tx) => {
     for (const eventId of ids) {
-      const r = await tx.insert(incidentEvents).values({ incidentId, eventId, addedBy: ctx.userId }).onConflictDoNothing().returning();
+      const r = await tx
+        .insert(incidentEvents)
+        .values({ incidentId, eventId, addedBy: ctx.userId })
+        .onConflictDoNothing()
+        .returning();
       if (r.length) {
         added++;
-        await auditCtx(ctx, 'incident.event_added', { type: 'incident', id: incidentId, metadata: { eventId } }, tx);
+        await auditCtx(
+          ctx,
+          'incident.event_added',
+          { type: 'incident', id: incidentId, metadata: { eventId } },
+          tx,
+        );
       }
     }
     await tx.update(incidents).set({ updatedAt: new Date() }).where(eq(incidents.id, incidentId));
@@ -247,7 +318,11 @@ export async function addEventsToIncident(ctx: AccessContext, incidentId: string
   return added;
 }
 
-export async function removeEventFromIncident(ctx: AccessContext, incidentId: string, eventId: string): Promise<void> {
+export async function removeEventFromIncident(
+  ctx: AccessContext,
+  incidentId: string,
+  eventId: string,
+): Promise<void> {
   requireIncidentWrite(ctx);
   await loadOwnIncident(ctx, incidentId);
   if (!isUuid(eventId)) throw new NotFoundError('Event');
@@ -256,7 +331,11 @@ export async function removeEventFromIncident(ctx: AccessContext, incidentId: st
     .where(and(eq(incidentEvents.incidentId, incidentId), eq(incidentEvents.eventId, eventId)))
     .returning();
   if (!removed.length) throw new NotFoundError('Event');
-  await auditCtx(ctx, 'incident.event_removed', { type: 'incident', id: incidentId, metadata: { eventId } });
+  await auditCtx(ctx, 'incident.event_removed', {
+    type: 'incident',
+    id: incidentId,
+    metadata: { eventId },
+  });
 }
 
 export async function deleteIncident(ctx: AccessContext, id: string): Promise<void> {
@@ -265,7 +344,11 @@ export async function deleteIncident(ctx: AccessContext, id: string): Promise<vo
   const now = new Date();
   await db()
     .update(incidents)
-    .set({ deletedAt: now, deletedBy: ctx.userId, purgeAfter: new Date(now.getTime() + config().DELETION_RETENTION_DAYS * 86400_000) })
+    .set({
+      deletedAt: now,
+      deletedBy: ctx.userId,
+      purgeAfter: new Date(now.getTime() + config().DELETION_RETENTION_DAYS * 86400_000),
+    })
     .where(eq(incidents.id, id));
   await auditCtx(ctx, 'incident.deleted', { type: 'incident', id });
 }
@@ -273,7 +356,10 @@ export async function deleteIncident(ctx: AccessContext, id: string): Promise<vo
 export async function restoreIncident(ctx: AccessContext, id: string): Promise<IncidentDTO> {
   requireIncidentWrite(ctx);
   await loadOwnIncident(ctx, id, true);
-  await db().update(incidents).set({ deletedAt: null, deletedBy: null, purgeAfter: null }).where(eq(incidents.id, id));
+  await db()
+    .update(incidents)
+    .set({ deletedAt: null, deletedBy: null, purgeAfter: null })
+    .where(eq(incidents.id, id));
   await auditCtx(ctx, 'incident.restored', { type: 'incident', id });
   return getIncident(ctx, id);
 }

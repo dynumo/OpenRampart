@@ -29,15 +29,22 @@ export async function freshCode(account: Account): Promise<string> {
 }
 
 /** Complete authenticator enrolment on the setup page, reading the manual key from the screen. */
-export async function enrolTotp(page: Page, account: Pick<Account, 'secret' | 'recoveryCodes' | 'lastEpoch'>) {
+export async function enrolTotp(
+  page: Page,
+  account: Pick<Account, 'secret' | 'recoveryCodes' | 'lastEpoch'>,
+) {
   await page.getByText('Cannot scan the code?').click();
   const key = (await page.locator('details .mono').first().textContent())!.replace(/\s/g, '');
   account.secret = key;
   account.lastEpoch = Math.floor(Date.now() / 1000);
-  await page.getByLabel('Code from the app').fill(await generate({ secret: key, epoch: account.lastEpoch }));
+  await page
+    .getByLabel('Code from the app')
+    .fill(await generate({ secret: key, epoch: account.lastEpoch }));
   await page.getByRole('button', { name: 'Confirm' }).click();
   await expect(page.getByRole('heading', { name: 'Save your recovery codes' })).toBeVisible();
-  account.recoveryCodes = (await page.locator('.recovery-codes li').allTextContents()).map((c) => c.trim());
+  account.recoveryCodes = (await page.locator('.recovery-codes li').allTextContents()).map((c) =>
+    c.trim(),
+  );
   expect(account.recoveryCodes).toHaveLength(10);
   await page.getByLabel('I have saved my recovery codes').check();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -51,7 +58,13 @@ export async function fillAccountForm(page: Page, username: string, displayName:
 }
 
 export async function register(page: Page, displayName = 'Alex Example'): Promise<Account> {
-  const account: Account = { username: uniq('user'), displayName, secret: '', recoveryCodes: [], lastEpoch: 0 };
+  const account: Account = {
+    username: uniq('user'),
+    displayName,
+    secret: '',
+    recoveryCodes: [],
+    lastEpoch: 0,
+  };
   await page.goto('/register');
   await fillAccountForm(page, account.username, displayName);
   await page.getByRole('button', { name: 'Create account' }).click();
@@ -66,7 +79,9 @@ export async function signIn(page: Page, account: Account, secondFactor?: string
   await page.getByLabel('Username or email').fill(account.username);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Code from your authenticator app').fill(secondFactor ?? (await freshCode(account)));
+  await page
+    .getByLabel('Code from your authenticator app')
+    .fill(secondFactor ?? (await freshCode(account)));
   await page.getByRole('button', { name: 'Continue' }).click();
 }
 
@@ -76,9 +91,22 @@ export async function signOut(page: Page) {
   await page.waitForLoadState('load');
 }
 
-export async function newSignedInContext(browser: Browser, account: Account, mobile = false): Promise<{ context: BrowserContext; page: Page }> {
+export async function newSignedInContext(
+  browser: Browser,
+  account: Account,
+  mobile = false,
+): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext(
-    mobile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'en-GB', timezoneId: 'Europe/London' } : { locale: 'en-GB', timezoneId: 'Europe/London' },
+    mobile
+      ? {
+          viewport: { width: 390, height: 844 },
+          isMobile: true,
+          hasTouch: true,
+          deviceScaleFactor: 2,
+          locale: 'en-GB',
+          timezoneId: 'Europe/London',
+        }
+      : { locale: 'en-GB', timezoneId: 'Europe/London' },
   );
   const page = await context.newPage();
   await signIn(page, account);
@@ -88,19 +116,42 @@ export async function newSignedInContext(browser: Browser, account: Account, mob
 
 /** WCAG 2.2 AA automated checks. Automated testing complements, not replaces, manual review. */
 export async function expectAccessible(page: Page, label: string) {
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
-  const summary = results.violations.map((v) => `${v.id} (${v.impact}): ${v.help} — ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(' | ')}`);
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  const summary = results.violations.map(
+    (v) =>
+      `${v.id} (${v.impact}): ${v.help} — ${v.nodes
+        .map((n) => n.target.join(' '))
+        .slice(0, 3)
+        .join(' | ')}`,
+  );
   expect(summary, `Accessibility violations on ${label}`).toEqual([]);
 }
 
-export async function createEventViaUi(page: Page, opts: { type: string; title: string; date?: string; actor?: string; newActor?: boolean; notes?: string }) {
+export async function createEventViaUi(
+  page: Page,
+  opts: {
+    type: string;
+    title: string;
+    date?: string;
+    actor?: string;
+    newActor?: boolean;
+    notes?: string;
+  },
+) {
   await page.goto(`/events/new/${opts.type}`);
   await page.getByLabel('Title').fill(opts.title);
   if (opts.date) await page.getByLabel('Date', { exact: true }).fill(opts.date);
   if (opts.actor) {
     await page.getByLabel('Actors', { exact: true }).fill(opts.actor);
-    if (opts.newActor) await page.getByRole('button', { name: `Create new Actor “${opts.actor}”` }).click();
-    else await page.getByRole('button', { name: new RegExp(`^Add ${opts.actor}`) }).first().click();
+    if (opts.newActor)
+      await page.getByRole('button', { name: `Create new Actor “${opts.actor}”` }).click();
+    else
+      await page
+        .getByRole('button', { name: new RegExp(`^Add ${opts.actor}`) })
+        .first()
+        .click();
   }
   if (opts.notes) await page.getByLabel('Notes').fill(opts.notes);
   await page.getByRole('button', { name: 'Save Event' }).click();
@@ -109,11 +160,20 @@ export async function createEventViaUi(page: Page, opts: { type: string; title: 
 }
 
 /** Call the JSON API from a signed-in page (shares the browser session and CSRF token). */
-export async function apiCall<T = unknown>(page: Page, method: string, path: string, body?: unknown, record?: string): Promise<T> {
+export async function apiCall<T = unknown>(
+  page: Page,
+  method: string,
+  path: string,
+  body?: unknown,
+  record?: string,
+): Promise<T> {
   const state = await (await page.request.get('/api/auth/state')).json();
   const res = await page.request.fetch(`/api${path}`, {
     method,
-    headers: { 'X-CSRF-Token': state.csrfToken ?? '1', ...(record ? { 'X-OpenRampart-Record': record } : {}) },
+    headers: {
+      'X-CSRF-Token': state.csrfToken ?? '1',
+      ...(record ? { 'X-OpenRampart-Record': record } : {}),
+    },
     data: body,
   });
   if (!res.ok()) throw new Error(`${method} ${path} → ${res.status()} ${await res.text()}`);
